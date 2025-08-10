@@ -46,19 +46,23 @@ app.get("/api", async (req, res) => {
     const Reservation = Reservations.Reservation;
     const CancelReservation = Reservations.CancelReservation;
 
+    const noReservationFound =
+      !Reservation || (Array.isArray(Reservation) && Reservation.length < 1);
     let reservationCount = 0;
     let revenue = 0;
     let nights = 0;
+    let ADR = 0;
 
-    for (const r of Reservation) {
-      for (const b of r.BookingTran) {
-        reservationCount += 1;
-        revenue += parseFloat(b.TotalAmountBeforeTax);
-        nights += b.RentalInfo.length;
+    if (!noReservationFound) {
+      for (const r of Reservation) {
+        for (const b of r.BookingTran) {
+          reservationCount += 1;
+          revenue += parseFloat(b.TotalAmountBeforeTax);
+          nights += b.RentalInfo.length;
+        }
       }
+      ADR = revenue / nights;
     }
-
-    const ADR = revenue / nights;
 
     const body = {
       Reservations: reservationCount,
