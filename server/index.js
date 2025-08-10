@@ -26,6 +26,12 @@ const normKey = (v) => {
 const todayISOcairo = () =>
   new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" }); // YYYY-MM-DD
 
+const getDayParam = (req) => {
+  const d = (req.query.day || "").toString().trim();
+  // minimal guard: expect YYYY-MM-DD; fallback to Cairo "today"
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayISOcairo();
+};
+
 async function fetchData() {
   // 1) Try cache
   try {
@@ -91,44 +97,40 @@ async function fetchData() {
   return data; // return fresh payload
 }
 
-app.get("/api", async (req, res) => {
-  try {
-    const data = await fetchData();
-    if (!data) {
-      console.log(`Data | ${data}`);
-      return res.status(500).json({ error: "Failed to fetch data" });
-    }
+// Core daily computation
+function computeDailyStats(data, day) {
+  const Reservations = data?.Reservations || {};
+  const Reservation = Array.isArray(Reservations?.Reservation)
+    ? Reservations.Reservation
+    : [];
+  const CancelReservation = Array.isArray(Reservations?.CancelReservation)
+    ? Reservations.CancelReservation
+    : [];
 
-    const Reservations = data.Reservations || {};
-    const Reservation = Array.isArray(Reservations?.Reservation)
-      ? Reservations.Reservation
-      : [];
-    const CancelReservation = Array.isArray(Reservations?.CancelReservation)
-      ? Reservations.CancelReservation
-      : [];
+  let reservationCount = 0;
+  let revenue = 0;
+  let nights = 0;
+  let ADR = 0;
+  let cancelationCount = 0;
 
-    const noReservationFound = Reservation.length < 1;
-    const noCancellationFound = CancelReservation.length < 1;
+  const sources = {};
+  const nationalities = {};
 
-    let reservationCount = 0;
-    let revenue = 0;
-    let nights = 0;
-    let ADR = 0;
-    let cancelationCount = 0;
+  // Bookings (per-day)
+  for (const r of Reservation) {
+    const trans = Array.isArray(r?.BookingTran) ? r.BookingTran : [];
+    for (const b of trans) {
+      const rental = Array.isArray(b?.RentalInfo) ? b.RentalInfo : [];
+      let hadDayRow = false;
 
-    /** groupings */
-    const sources = {};
-    const nationalities = {};
+      for (const ri of rental) {
+        if ((ri?.EffectiveDate || "").trim() === day) {
+          hadDayRow = true;
+          const rent = Number(ri?.Rent) || 0;
+          revenue += rent;
+          nights += 1;
 
-    if (!noReservationFound) {
-      for (const r of Reservation) {
-        const trans = Array.isArray(r?.BookingTran) ? r.BookingTran : [];
-        for (const b of trans) {
-          reservationCount += 1;
-          revenue += Number(b?.TotalAmountBeforeTax) || 0;
-          nights += Array.isArray(b?.RentalInfo) ? b.RentalInfo.length : 0;
-
-          // Source grouping
+          // groupings by Source/Nationality for the same day
           const sourceKey = normKey(b?.Source);
           if (!sources[sourceKey]) {
             sources[sourceKey] = {
@@ -138,13 +140,9 @@ app.get("/api", async (req, res) => {
               ADR: 0,
             };
           }
-          sources[sourceKey].reservationCount += 1;
-          sources[sourceKey].revenue += Number(b?.TotalAmountBeforeTax) || 0;
-          sources[sourceKey].nights += Array.isArray(b?.RentalInfo)
-            ? b.RentalInfo.length
-            : 0;
+          sources[sourceKey].revenue += rent;
+          sources[sourceKey].nights += 1;
 
-          // Nationality grouping
           const natKey = normKey(b?.Nationality);
           if (!nationalities[natKey]) {
             nationalities[natKey] = {
@@ -154,49 +152,77 @@ app.get("/api", async (req, res) => {
               ADR: 0,
             };
           }
-          nationalities[natKey].reservationCount += 1;
-          nationalities[natKey].revenue += Number(b?.TotalAmountBeforeTax) || 0;
-          nationalities[natKey].nights += Array.isArray(b?.RentalInfo)
-            ? b.RentalInfo.length
-            : 0;
+          nationalities[natKey].revenue += rent;
+          nationalities[natKey].nights += 1;
         }
       }
 
-      ADR = nights === 0 ? 0 : revenue / nights;
+      if (hadDayRow) {
+        reservationCount += 1;
 
-      // compute ADR per source/nationality (same definition you used)
-      for (const k in sources) {
-        const s = sources[k];
-        s.ADR = s.nights === 0 ? 0 : s.revenue / s.nights;
-      }
-      for (const k in nationalities) {
-        const n = nationalities[k];
-        n.ADR = n.nights === 0 ? 0 : n.revenue / n.nights;
-      }
-    }
+        // count booking once per source/nationality if it had any row that day
+        const sourceKey = normKey(b?.Source);
+        sources[sourceKey].reservationCount += 1;
 
-    if (!noCancellationFound) {
-      const today = todayISOcairo();
-      for (const c of CancelReservation) {
-        const cancelDate = (c?.Canceldatetime || "").split(" ")[0];
-        if (cancelDate === today) {
-          cancelationCount += 1;
-        }
+        const natKey = normKey(b?.Nationality);
+        nationalities[natKey].reservationCount += 1;
       }
     }
+  }
 
-    res.json({
-      stats: {
-        all: {
-          Reservations: reservationCount,
-          Revenue: revenue,
-          Nights: nights,
-          ADR: ADR,
-          Cancellations: cancelationCount,
-        },
-        sources: sources,
-        nationalities: nationalities,
+  ADR = nights === 0 ? 0 : revenue / nights;
+
+  // ADR per group
+  for (const k in sources) {
+    const s = sources[k];
+    s.ADR = s.nights === 0 ? 0 : s.revenue / s.nights;
+  }
+  for (const k in nationalities) {
+    const n = nationalities[k];
+    n.ADR = n.nights === 0 ? 0 : n.revenue / n.nights;
+  }
+
+  // Cancellations for that exact day (Cairo)
+  for (const c of CancelReservation) {
+    const cancelDate = (c?.Canceldatetime || "").split(" ")[0];
+    if (cancelDate === day) cancelationCount += 1;
+  }
+
+  return {
+    stats: {
+      all: {
+        Day: day,
+        Reservations: reservationCount,
+        Revenue: revenue,
+        Nights: nights,
+        ADR: ADR,
+        Cancellations: cancelationCount,
       },
+      sources,
+      nationalities,
+    },
+  };
+}
+
+// New routes: /api/stats and /api/report (both accept ?day=)
+app.get("/api/stats", async (req, res) => {
+  try {
+    const day = getDayParam(req);
+    const data = await fetchData();
+    if (!data) return res.status(500).json({ error: "Failed to fetch data" });
+    const result = computeDailyStats(data, day);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message || String(e) });
+  }
+});
+
+// To Be Created
+app.get("/api/report", async (req, res) => {
+  try {
+    res.json({
+      message: "Daily Report endpoint is under construction.",
     });
   } catch (e) {
     console.error(e);
