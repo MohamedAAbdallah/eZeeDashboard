@@ -106,6 +106,7 @@ app.get("/api", async (req, res) => {
     let nights = 0;
     let ADR = 0;
     let cancelationCount = 0;
+    let sources = {};
 
     if (!noReservationFound) {
       for (const r of Reservation) {
@@ -114,9 +115,25 @@ app.get("/api", async (req, res) => {
           reservationCount += 1;
           revenue += Number(b?.TotalAmountBeforeTax) || 0;
           nights += Array.isArray(b?.RentalInfo) ? b.RentalInfo.length : 0;
+
+          const source = b?.Source.toLowerCase().trim();
+          if (!sources[source]) {
+            sources[source] = { reservationCount: 0, revenue: 0, nights: 0 };
+          }
+          sources[source].reservationCount += 1;
+          sources[source].revenue += Number(b?.TotalAmountBeforeTax) || 0;
+          sources[source].nights += Array.isArray(b?.RentalInfo)
+            ? b.RentalInfo.length
+            : 0;
         }
       }
       ADR = nights === 0 ? 0 : revenue / nights;
+      for (const source in sources) {
+        sources[source].ADR =
+          sources[source].nights === 0
+            ? 0
+            : sources[source].revenue / sources[source].nights;
+      }
     }
 
     if (!noCancellationFound) {
@@ -136,6 +153,7 @@ app.get("/api", async (req, res) => {
       Nights: nights,
       ADR: ADR,
       Cancellations: cancelationCount,
+      Sources: sources,
     });
   } catch (e) {
     console.error(e);
