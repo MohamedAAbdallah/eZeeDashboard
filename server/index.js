@@ -107,6 +107,7 @@ app.get("/api", async (req, res) => {
     let ADR = 0;
     let cancelationCount = 0;
     let sources = {};
+    let nationalities = {};
 
     if (!noReservationFound) {
       for (const r of Reservation) {
@@ -123,6 +124,20 @@ app.get("/api", async (req, res) => {
           sources[source].reservationCount += 1;
           sources[source].revenue += Number(b?.TotalAmountBeforeTax) || 0;
           sources[source].nights += Array.isArray(b?.RentalInfo)
+            ? b.RentalInfo.length
+            : 0;
+          const nationality = b?.Nationality.toLowerCase().trim();
+          if (!nationalities[nationality]) {
+            nationalities[nationality] = {
+              reservationCount: 0,
+              revenue: 0,
+              nights: 0,
+            };
+          }
+          nationalities[nationality].reservationCount += 1;
+          nationalities[nationality].revenue +=
+            Number(b?.TotalAmountBeforeTax) || 0;
+          nationalities[nationality].nights += Array.isArray(b?.RentalInfo)
             ? b.RentalInfo.length
             : 0;
         }
@@ -148,12 +163,17 @@ app.get("/api", async (req, res) => {
     }
 
     res.json({
-      Reservations: reservationCount,
-      Revenue: revenue,
-      Nights: nights,
-      ADR: ADR,
-      Cancellations: cancelationCount,
-      Sources: sources,
+      stats: {
+        all: {
+          Reservations: reservationCount,
+          Revenue: revenue,
+          Nights: nights,
+          ADR: ADR,
+          Cancellations: cancelationCount,
+        },
+        sources: sources,
+        nationalities: nationalities,
+      },
     });
   } catch (e) {
     console.error(e);
