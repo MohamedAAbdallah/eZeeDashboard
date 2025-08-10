@@ -81,11 +81,12 @@ async function fetchData() {
 
 app.get("/api", async (req, res) => {
   try {
-    const data = await fetchData(req, res);
+    const data = await fetchData();
     if (!data) {
       console.log(`Data | ${data}`);
       return res.status(500).json({ error: "Failed to fetch data" });
     }
+
     const Reservations = data.Reservations;
 
     const Reservation = Reservations.Reservation;
@@ -100,30 +101,25 @@ app.get("/api", async (req, res) => {
 
     if (!noReservationFound) {
       for (const r of Reservation) {
-        for (const b of r.BookingTran) {
+        const trans = Array.isArray(r?.BookingTran) ? r.BookingTran : [];
+        for (const b of trans) {
           reservationCount += 1;
-          revenue += parseFloat(Number(b.TotalAmountBeforeTax) || 0);
-          nights += b.RentalInfo.length;
+          revenue += Number(b?.TotalAmountBeforeTax) || 0;
+          nights += Array.isArray(b?.RentalInfo) ? b.RentalInfo.length : 0;
         }
       }
-      if (nights === 0) {
-        ADR = 0;
-      } else {
-        ADR = revenue / nights;
-      }
+      ADR = nights === 0 ? 0 : revenue / nights;
     }
 
-    const body = {
+    res.json({
       Reservations: reservationCount,
       Revenue: revenue,
       Nights: nights,
       ADR: ADR,
-    };
-
-    res.json(body);
+    });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: e.message || String(e) });
   }
 });
 
