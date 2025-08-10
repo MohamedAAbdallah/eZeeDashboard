@@ -69,6 +69,7 @@ async function fetchData() {
   // 3) Write cache (fire-and-forget)
   try {
     const cacheObj = { timestamp: Date.now(), data };
+    console.log(`Updated Cache: ${cacheObj.timestamp}`);
     fs.writeFile("./cache.json", JSON.stringify(cacheObj), (err) => {
       if (err) console.error("Error writing cache to disk:", err);
     });
