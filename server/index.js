@@ -16,33 +16,35 @@ app.get("/", async (req, res) => {
   }
 });
 
-async function fetchData(req, res) {
+async function fetchData() {
+  // 1) Try cache
   try {
-    let cache = fs.readFileSync("./cache.json", "utf-8");
-    if (cache) {
+    const raw = fs.readFileSync("./cache.json", "utf-8");
+    if (raw) {
       try {
-        cache = JSON.parse(cache);
-        // Check if cache is still valid
-        if (
-          cache.timestamp &&
-          Date.now() - cache.timestamp < process.env.CACHE_TIMEOUT * 1000
-        ) {
-          console.log(`Used Cache ${cache.timestamp} ${Date.now()}`);
-          return res.json(cache.data);
+        const cacheObj = JSON.parse(raw);
+        const timeoutMs = (Number(process.env.CACHE_TIMEOUT) || 0) * 1000;
+        if (cacheObj.timestamp && Date.now() - cacheObj.timestamp < timeoutMs) {
+          console.log(
+            `Used Cache ts=${cacheObj.timestamp} now=${Date.now()} diff=${
+              Date.now() - cacheObj.timestamp
+            }`
+          );
+          return cacheObj.data; // return cached payload
         }
       } catch (e) {
-        console.error("Error parsing cache:", e);
+        console.warn("Error parsing cache:", e);
       }
     }
   } catch (e) {
-    console.error("Error reading cache:", e);
+    // this is expected for dry runs.
+    console.warn("Error reading cache:", e);
   }
 
+  // 2) Fetch upstream
   const r = await fetch(process.env.END_POINT_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       RES_Request: {
         Request_Type: "Bookings",
@@ -55,22 +57,26 @@ async function fetchData(req, res) {
   });
 
   if (!r.ok) {
-    console.error("VENDOR API Error Details:", data);
-    return res.status(r.status).json({
-      error: "Upstream error",
-      status: r.status,
-      details: data,
-    });
+    const errorText = await r.text().catch(() => "");
+    console.error("VENDOR API Error Details:", errorText);
+    throw new Error(
+      `Upstream error (${r.status}): ${errorText || r.statusText}`
+    );
   }
 
   const data = await r.json();
-  const cache = { timestamp: Date.now(), data };
 
-  fs.writeFile("./cache.json", JSON.stringify(cache), (err) => {
-    if (err) {
-      console.error("Error writing cache to disk:", err);
-    }
-  });
+  // 3) Write cache (fire-and-forget)
+  try {
+    const cacheObj = { timestamp: Date.now(), data };
+    fs.writeFile("./cache.json", JSON.stringify(cacheObj), (err) => {
+      if (err) console.error("Error writing cache to disk:", err);
+    });
+  } catch (e) {
+    console.error("Error scheduling cache write:", e);
+  }
+
+  return data; // return fresh payload
 }
 
 app.get("/api", async (req, res) => {
