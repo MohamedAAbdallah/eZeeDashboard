@@ -57,6 +57,8 @@ async function fetchData() {
   });
 
   if (!r.ok) {
+    // FUTURE_TODO: Implement cache fallback if no upstream
+    //               Use CACHE_ERROR_TIMEOUT to determine fallback duration
     const errorText = await r.text().catch(() => "");
     console.error("VENDOR API Error Details:", errorText);
     throw new Error(
@@ -95,10 +97,15 @@ app.get("/api", async (req, res) => {
 
     const noReservationFound =
       !Reservation || (Array.isArray(Reservation) && Reservation.length < 1);
+    const noCancellationFound =
+      !CancelReservation ||
+      (Array.isArray(CancelReservation) && CancelReservation.length < 1);
+
     let reservationCount = 0;
     let revenue = 0;
     let nights = 0;
     let ADR = 0;
+    let cancelationCount = 0;
 
     if (!noReservationFound) {
       for (const r of Reservation) {
@@ -112,11 +119,23 @@ app.get("/api", async (req, res) => {
       ADR = nights === 0 ? 0 : revenue / nights;
     }
 
+    if (!noCancellationFound) {
+      for (const c of CancelReservation) {
+        if (
+          c.Canceldatetime.split(" ")[0] ===
+          new Date().toISOString().split("T")[0]
+        ) {
+          cancelationCount += 1;
+        }
+      }
+    }
+
     res.json({
       Reservations: reservationCount,
       Revenue: revenue,
       Nights: nights,
       ADR: ADR,
+      Cancellations: cancelationCount,
     });
   } catch (e) {
     console.error(e);
