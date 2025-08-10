@@ -75,5 +75,5 @@ app.get("/api", async (req, res) => {
 });
 
 app.listen(process.env.PORT || 5174, () =>
-  console.log(`Server running on https://localhost:${process.env.port || 5174}`)
+  console.log(`Server running on http://localhost:${process.env.PORT || 5174}`)
 );
