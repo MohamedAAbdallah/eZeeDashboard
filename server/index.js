@@ -1,8 +1,10 @@
 import "dotenv/config";
 import express from "express";
 import fetch from "node-fetch";
+import cors from "cors";
 
 const app = express();
+app.use(cors());
 
 app.get("/", async (req, res) => {
   try {
