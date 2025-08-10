@@ -30,11 +30,13 @@ app.get("/test", async (req, res) => {
         },
       }),
     });
-    
+
     if (!r.ok) {
       const errorData = await r.json();
       console.error("VENDOR API Error Details:", errorData);
-      throw new Error(`VENDOR API Error! status: ${r.status} ${errorData.message}`);
+      throw new Error(
+        `VENDOR API Error! status: ${r.status} ${errorData.message}`
+      );
     }
 
     const data = await r.json();
