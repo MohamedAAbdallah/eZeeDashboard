@@ -13,7 +13,7 @@ app.get("/", async (req, res) => {
   }
 });
 
-app.get("/test", async (req, res) => {
+app.get("/api", async (req, res) => {
   try {
     const r = await fetch(process.env.END_POINT_URL, {
       method: "POST",
