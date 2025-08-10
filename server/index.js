@@ -58,7 +58,7 @@ app.get("/api", async (req, res) => {
       for (const r of Reservation) {
         for (const b of r.BookingTran) {
           reservationCount += 1;
-          revenue += parseFloat(b.TotalAmountBeforeTax);
+          revenue += parseFloat(Number(b.TotalAmountBeforeTax) || 0);
           nights += b.RentalInfo.length;
         }
       }
