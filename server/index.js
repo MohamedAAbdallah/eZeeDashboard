@@ -32,6 +32,14 @@ const getDayParam = (req) => {
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayISOcairo();
 };
 
+const getMonthParam = (req) => {
+  const m = (req.query.month || "").toString().trim();
+  // Expect YYYY-MM; fallback to Cairo "today" month
+  if (/^\d{4}-\d{2}$/.test(m)) return m;
+  const today = todayISOcairo(); // YYYY-MM-DD
+  return today.slice(0, 7); // YYYY-MM
+};
+
 async function fetchData() {
   // 1) Try cache
   try {
@@ -204,7 +212,86 @@ function computeDailyStats(data, day) {
   };
 }
 
-// New routes: /api/stats and /api/report (both accept ?day=)
+// -------- Monthly calendar (new) --------
+// Assumption: API exposes room *types*, not physical room numbers.
+// We build a calendar per RoomTypeCode/Name and mark which days have rent rows.
+function computeMonthlyCalendar(data, month) {
+  // month: "YYYY-MM"
+  const Reservations = data?.Reservations || {};
+  const Reservation = Array.isArray(Reservations?.Reservation)
+    ? Reservations.Reservation
+    : [];
+
+  const [Y, M] = month.split("-").map((v) => Number(v));
+  const daysInMonth = new Date(Y, M, 0).getDate(); // JS month is 1-based here because we pass M directly
+  const monthPrefix = month + "-"; // e.g., "2025-08-"
+
+  // Calendar: rooms[roomTypeCode] = { code, name, days: [{booked:boolean, rent:number}], totals:{nights,revenue} }
+  const rooms = {};
+  // Totals per day across all room types
+  const totalsByDay = Array.from({ length: daysInMonth }, (_, i) => ({
+    day: i + 1,
+    revenue: 0,
+    nights: 0,
+  }));
+
+  for (const r of Reservation) {
+    const trans = Array.isArray(r?.BookingTran) ? r.BookingTran : [];
+    for (const b of trans) {
+      const rental = Array.isArray(b?.RentalInfo) ? b.RentalInfo : [];
+      for (const ri of rental) {
+        const eff = (ri?.EffectiveDate || "").trim();
+        if (!eff.startsWith(monthPrefix)) continue;
+
+        const code = ri?.RoomTypeCode || b?.RoomTypeCode || "unknown";
+        const name = ri?.RoomTypeName || b?.RoomTypeName || "Unknown Room Type";
+        if (!rooms[code]) {
+          rooms[code] = {
+            code,
+            name,
+            days: Array.from({ length: daysInMonth }, () => ({
+              booked: false,
+              rent: 0,
+            })),
+            totals: { nights: 0, revenue: 0 },
+          };
+        }
+
+        // Day index (1..N -> 0..N-1)
+        const dnum = Number(eff.slice(8, 10));
+        if (!Number.isFinite(dnum) || dnum < 1 || dnum > daysInMonth) continue;
+
+        const rent = Number(ri?.Rent) || 0;
+
+        // mark day for this room type
+        const cell = rooms[code].days[dnum - 1];
+        cell.booked = true;
+        cell.rent += rent;
+
+        rooms[code].totals.nights += 1;
+        rooms[code].totals.revenue += rent;
+
+        totalsByDay[dnum - 1].nights += 1;
+        totalsByDay[dnum - 1].revenue += rent;
+      }
+    }
+  }
+
+  // Overall summary
+  const summary = {
+    month,
+    daysInMonth,
+    totalRooms: Object.keys(rooms).length,
+    totalNights: totalsByDay.reduce((s, d) => s + d.nights, 0),
+    totalRevenue: totalsByDay.reduce((s, d) => s + d.revenue, 0),
+  };
+
+  return { summary, calendar: { rooms, totalsByDay } };
+}
+
+// -------- Routes --------
+
+// Daily stats endpoint (kept)
 app.get("/api/stats", async (req, res) => {
   try {
     const day = getDayParam(req);
@@ -218,12 +305,22 @@ app.get("/api/stats", async (req, res) => {
   }
 });
 
-// To Be Created
+// Report endpoint: if ?month is present -> monthly calendar; else -> daily (groundwork for richer reports)
 app.get("/api/report", async (req, res) => {
   try {
-    res.json({
-      message: "Daily Report endpoint is under construction.",
-    });
+    const data = await fetchData();
+    if (!data) return res.status(500).json({ error: "Failed to fetch data" });
+
+    if (req.query.month) {
+      const month = getMonthParam(req); // YYYY-MM
+      const result = computeMonthlyCalendar(data, month);
+      return res.json({ report: result });
+    }
+
+    // fallback to daily report if "day" provided or missing (defaults to today)
+    const day = getDayParam(req);
+    const result = computeDailyStats(data, day);
+    return res.json({ report: result });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: e.message || String(e) });
