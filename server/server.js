@@ -43,7 +43,7 @@ const getMonthParam = (req) => {
 async function fetchData() {
   // 1) Try cache
   try {
-    const raw = fs.readFileSync("./cache.json", "utf-8");
+    const raw = fs.readFileSync("./server/cache.json", "utf-8");
     if (raw) {
       try {
         const cacheObj = JSON.parse(raw);
