@@ -32,11 +32,12 @@ app.get("/api", async (req, res) => {
     });
 
     if (!r.ok) {
-      const errorData = await r.json();
-      console.error("VENDOR API Error Details:", errorData);
-      throw new Error(
-        `VENDOR API Error! status: ${r.status} ${errorData.message}`
-      );
+      console.error("VENDOR API Error Details:", data);
+      return res.status(r.status).json({
+        error: "Upstream error",
+        status: r.status,
+        details: data,
+      });
     }
 
     const data = await r.json();
