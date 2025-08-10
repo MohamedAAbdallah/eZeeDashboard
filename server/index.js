@@ -38,8 +38,34 @@ app.get("/test", async (req, res) => {
     }
 
     const data = await r.json();
-    // To Be Played With
-    res.json(data);
+
+    const Reservations = data.Reservations;
+
+    const Reservation = Reservations.Reservation;
+    const CancelReservation = Reservations.CancelReservation;
+
+    let reservationCount = 0;
+    let revenue = 0;
+    let nights = 0;
+
+    for (const r of Reservation) {
+      for (const b of r.BookingTran) {
+        reservationCount += 1;
+        revenue += parseFloat(b.TotalAmountBeforeTax);
+        nights += b.RentalInfo.length;
+      }
+    }
+
+    const ADR = revenue / nights;
+
+    const body = {
+      Reservations: reservationCount,
+      Revenue: revenue,
+      Nights: nights,
+      ADR: ADR,
+    };
+
+    res.json(body);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: e.message });
