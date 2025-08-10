@@ -1,11 +1,16 @@
 import "dotenv/config";
 import express from "express";
 import fetch from "node-fetch";
-import cors from "cors";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express();
-app.use(cors());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use(express.static(path.join(__dirname, "client")));
 
 app.get("/", async (req, res) => {
   try {
@@ -14,6 +19,10 @@ app.get("/", async (req, res) => {
     console.error(e);
     res.status(500).json({ error: e.message });
   }
+});
+
+app.get("/dashboard", (_req, res) => {
+  res.sendFile(path.join(__dirname, "client", "index.html"));
 });
 
 // Helpers
