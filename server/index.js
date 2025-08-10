@@ -61,7 +61,11 @@ app.get("/api", async (req, res) => {
           nights += b.RentalInfo.length;
         }
       }
-      ADR = revenue / nights;
+      if (nights === 0) {
+        ADR = 0;
+      } else {
+        ADR = revenue / nights;
+      }
     }
 
     const body = {
