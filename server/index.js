@@ -16,6 +16,16 @@ app.get("/", async (req, res) => {
   }
 });
 
+// Helpers
+const timeoutMs = (Number(process.env.CACHE_TIMEOUT) || 0) * 1000;
+const normKey = (v) => {
+  if (typeof v !== "string") return "unknown";
+  const t = v.trim();
+  return t ? t.toLowerCase() : "unknown";
+};
+const todayISOcairo = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" }); // YYYY-MM-DD
+
 async function fetchData() {
   // 1) Try cache
   try {
@@ -23,7 +33,6 @@ async function fetchData() {
     if (raw) {
       try {
         const cacheObj = JSON.parse(raw);
-        const timeoutMs = (Number(process.env.CACHE_TIMEOUT) || 0) * 1000;
         if (cacheObj.timestamp && Date.now() - cacheObj.timestamp < timeoutMs) {
           console.log(
             `Used Cache ts=${cacheObj.timestamp} now=${Date.now()} diff=${
@@ -58,7 +67,7 @@ async function fetchData() {
 
   if (!r.ok) {
     // FUTURE_TODO: Implement cache fallback if no upstream
-    //               Use CACHE_ERROR_TIMEOUT to determine fallback duration
+    //             Use CACHE_ERROR_TIMEOUT to determine fallback duration
     const errorText = await r.text().catch(() => "");
     console.error("VENDOR API Error Details:", errorText);
     throw new Error(
@@ -90,24 +99,26 @@ app.get("/api", async (req, res) => {
       return res.status(500).json({ error: "Failed to fetch data" });
     }
 
-    const Reservations = data.Reservations;
+    const Reservations = data.Reservations || {};
+    const Reservation = Array.isArray(Reservations?.Reservation)
+      ? Reservations.Reservation
+      : [];
+    const CancelReservation = Array.isArray(Reservations?.CancelReservation)
+      ? Reservations.CancelReservation
+      : [];
 
-    const Reservation = Reservations.Reservation;
-    const CancelReservation = Reservations.CancelReservation;
-
-    const noReservationFound =
-      !Reservation || (Array.isArray(Reservation) && Reservation.length < 1);
-    const noCancellationFound =
-      !CancelReservation ||
-      (Array.isArray(CancelReservation) && CancelReservation.length < 1);
+    const noReservationFound = Reservation.length < 1;
+    const noCancellationFound = CancelReservation.length < 1;
 
     let reservationCount = 0;
     let revenue = 0;
     let nights = 0;
     let ADR = 0;
     let cancelationCount = 0;
-    let sources = {};
-    let nationalities = {};
+
+    /** groupings */
+    const sources = {};
+    const nationalities = {};
 
     if (!noReservationFound) {
       for (const r of Reservation) {
@@ -117,46 +128,58 @@ app.get("/api", async (req, res) => {
           revenue += Number(b?.TotalAmountBeforeTax) || 0;
           nights += Array.isArray(b?.RentalInfo) ? b.RentalInfo.length : 0;
 
-          const source = b?.Source.toLowerCase().trim();
-          if (!sources[source]) {
-            sources[source] = { reservationCount: 0, revenue: 0, nights: 0 };
-          }
-          sources[source].reservationCount += 1;
-          sources[source].revenue += Number(b?.TotalAmountBeforeTax) || 0;
-          sources[source].nights += Array.isArray(b?.RentalInfo)
-            ? b.RentalInfo.length
-            : 0;
-          const nationality = b?.Nationality.toLowerCase().trim();
-          if (!nationalities[nationality]) {
-            nationalities[nationality] = {
+          // Source grouping
+          const sourceKey = normKey(b?.Source);
+          if (!sources[sourceKey]) {
+            sources[sourceKey] = {
               reservationCount: 0,
               revenue: 0,
               nights: 0,
+              ADR: 0,
             };
           }
-          nationalities[nationality].reservationCount += 1;
-          nationalities[nationality].revenue +=
-            Number(b?.TotalAmountBeforeTax) || 0;
-          nationalities[nationality].nights += Array.isArray(b?.RentalInfo)
+          sources[sourceKey].reservationCount += 1;
+          sources[sourceKey].revenue += Number(b?.TotalAmountBeforeTax) || 0;
+          sources[sourceKey].nights += Array.isArray(b?.RentalInfo)
+            ? b.RentalInfo.length
+            : 0;
+
+          // Nationality grouping
+          const natKey = normKey(b?.Nationality);
+          if (!nationalities[natKey]) {
+            nationalities[natKey] = {
+              reservationCount: 0,
+              revenue: 0,
+              nights: 0,
+              ADR: 0,
+            };
+          }
+          nationalities[natKey].reservationCount += 1;
+          nationalities[natKey].revenue += Number(b?.TotalAmountBeforeTax) || 0;
+          nationalities[natKey].nights += Array.isArray(b?.RentalInfo)
             ? b.RentalInfo.length
             : 0;
         }
       }
+
       ADR = nights === 0 ? 0 : revenue / nights;
-      for (const source in sources) {
-        sources[source].ADR =
-          sources[source].nights === 0
-            ? 0
-            : sources[source].revenue / sources[source].nights;
+
+      // compute ADR per source/nationality (same definition you used)
+      for (const k in sources) {
+        const s = sources[k];
+        s.ADR = s.nights === 0 ? 0 : s.revenue / s.nights;
+      }
+      for (const k in nationalities) {
+        const n = nationalities[k];
+        n.ADR = n.nights === 0 ? 0 : n.revenue / n.nights;
       }
     }
 
     if (!noCancellationFound) {
+      const today = todayISOcairo();
       for (const c of CancelReservation) {
-        if (
-          c.Canceldatetime.split(" ")[0] ===
-          new Date().toISOString().split("T")[0]
-        ) {
+        const cancelDate = (c?.Canceldatetime || "").split(" ")[0];
+        if (cancelDate === today) {
           cancelationCount += 1;
         }
       }
