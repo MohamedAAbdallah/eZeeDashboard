@@ -214,9 +214,6 @@
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 12px">
-          <label class="switch" title="Refresh automatically every 60 seconds">
-            <input id="autoRefresh" type="checkbox" /> Auto-refresh (60s)
-          </label>
           <nav>
             <a class="active" href="/dashboard">Stats</a>
             <a href="/report.html">Report</a>
@@ -364,7 +361,6 @@
       const AUTO_MS = 60000;
 
       const $date = document.getElementById("dateText");
-      const $auto = document.getElementById("autoRefresh");
       const $week = document.getElementById("week");
       const $updDot = document.getElementById("upd-dot");
       const $updText = document.getElementById("upd-text");
@@ -621,36 +617,27 @@
       });
 
       // Auto-refresh: only the selected day
-      let timer = null;
-      $auto.addEventListener("change", (e) => {
-        if (e.target.checked) {
-          timer = setInterval(async () => {
-            if (selectedIndex < 0) return;
-            setUpdatedLoading(true, "Refreshing…");
-            const d = weekDays[selectedIndex];
-            const json = await fetch(API(d.ymd), { cache: "no-store" })
-              .then((r) => r.json())
-              .catch(() => null);
-            if (json) {
-              weekDays[selectedIndex].stats = json;
-              const maxRev = Math.max(
-                0,
-                ...weekDays.map((x) =>
-                  Number(x.stats?.stats?.all?.Revenue || 0)
-                )
-              );
-              weekDays.forEach((x) => (x._maxRev = maxRev));
-              renderWeek();
-              applyStats(weekDays[selectedIndex]);
-            } else {
-              setUpdatedLoading(false);
-            }
-          }, AUTO_MS);
+      // always-on auto-refresh
+      let timer = setInterval(async () => {
+        if (selectedIndex < 0) return;
+        setUpdatedLoading(true, "Refreshing…");
+        const d = weekDays[selectedIndex];
+        const json = await fetch(API(d.ymd), { cache: "no-store" })
+          .then((r) => r.json())
+          .catch(() => null);
+        if (json) {
+          weekDays[selectedIndex].stats = json;
+          const maxRev = Math.max(
+            0,
+            ...weekDays.map((x) => Number(x.stats?.stats?.all?.Revenue || 0))
+          );
+          weekDays.forEach((x) => (x._maxRev = maxRev));
+          renderWeek();
+          applyStats(weekDays[selectedIndex]);
         } else {
-          clearInterval(timer);
-          timer = null;
+          setUpdatedLoading(false);
         }
-      });
+      }, AUTO_MS);
 
       // init
       loadWeek();
