@@ -63,7 +63,6 @@ body {
   margin: 0 0 6px;
   font-size: 28px;
   font-weight: 800;
-  letter-spacing: -0.02em;
 }
 .subtitle {
   margin: 0;
@@ -192,7 +191,6 @@ nav a.active {
   margin-top: 8px;
   font-weight: 800;
   font-size: 32px;
-  letter-spacing: -0.02em;
 }
 .badge {
   width: 42px;
@@ -230,7 +228,6 @@ nav a.active {
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  letter-spacing: -0.01em;
   color: var(--accent);
 }
 .table-card {
