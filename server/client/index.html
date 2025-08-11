@@ -7,30 +7,177 @@
     <!-- global + dashboard styles -->
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/index.css" />
+
+    <!-- Screaming in agony, front-end is too messy for my liking -->
+
     <style>
-      /* Week navigation arrows */
-      .week-nav {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
+      /* keep the same palette but make sure bg always paints correctly */
+      :root {
+        --brand: #c81f3c;
+        --brand-2: #bb1b37;
+        --accent: #4e1e42;
+        --paper: #dfd0d2;
+
+        --bg: #faf9fa;
+        --panel: rgba(255, 255, 255, 0.85);
+        --panel-border: color-mix(in oklab, var(--paper) 70%, #fff);
+        --text: #1a1a1a;
+        --muted: color-mix(in oklab, var(--accent) 35%, #6b7280);
+        --shadow: 0 20px 40px -20px rgba(20, 10, 14, 0.25);
+        --blur: blur(10px);
       }
-      .week-nav button {
-        background: none;
-        border: none;
-        color: #dfd0d2;
-        font-size: 1.2rem;
-        cursor: pointer;
-        padding: 4px 8px;
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #120914;
+          --panel: color-mix(in oklab, var(--accent) 26%, transparent);
+          --panel-border: color-mix(in oklab, var(--paper) 18%, #000);
+          --text: #f4f2f3;
+          --muted: color-mix(in oklab, var(--paper) 45%, #8791a1);
+          --shadow: 0 16px 40px -20px rgba(0, 0, 0, 0.6);
+        }
       }
-      .week-nav button:hover {
-        color: #fff;
+
+      /* lock in the gradient so it never “breaks” on mobile */
+      html,
+      body {
+        height: 100%;
       }
-      /* KPI value fix */
+      body {
+        background: radial-gradient(
+            900px 500px at 10% -10%,
+            color-mix(in oklab, var(--brand) 15%, transparent),
+            transparent 55%
+          ),
+          radial-gradient(
+            700px 400px at 110% 10%,
+            color-mix(in oklab, var(--brand-2) 12%, transparent),
+            transparent 60%
+          ),
+          var(--bg);
+        background-attachment: fixed, fixed, fixed;
+      }
+
+      /* make KPIs resilient to big numbers */
       .value {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* hide the KPI icons to avoid crowding on small screens (kept DOM for history) */
+      .badge {
+        display: none;
+      }
+
+      /* week controls: small fix for layout */
+      .week-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 6px 0 10px;
+      }
+      .week-btn {
+        appearance: none;
+        border: 1px solid var(--panel-border);
+        background: var(--panel);
+        border-radius: 12px;
+        padding: 8px 10px;
+        cursor: pointer;
+        backdrop-filter: var(--blur);
+      }
+      .week-btn:active {
+        transform: translateY(1px);
+      }
+
+      /* selected-day indicator (click to jump) */
+      .picked {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 999px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        cursor: pointer;
+        user-select: none;
+        backdrop-filter: var(--blur);
+      }
+      .picked .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--brand-2);
+      }
+
+      /* tables on mobile: always scroll horizontally without breaking layout */
+      .table-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      table {
+        min-width: 560px;
+      } /* keeps columns readable on narrow screens */
+
+      /* header wrap on small screens */
+      @media (max-width: 720px) {
+        .header {
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+        .title {
+          font-size: 22px;
+        }
+        nav a {
+          padding: 6px 8px;
+        }
+      }
+      /* KPI grid for phones */
+      @media (max-width: 640px) {
+        .grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+      }
+      @media (max-width: 420px) {
+        .grid {
+          grid-template-columns: 1fr !important;
+        }
+      }
+
+      /* “Updated …” tucks nicely under title on narrow screens */
+      .updated {
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0.85;
+        margin-left: 8px;
+      }
+      .updated .txt {
+        white-space: nowrap;
+      }
+      .updated .spinner {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        border-top-color: currentColor;
+        animation: spin 0.8s linear infinite;
+        margin-right: 6px;
+        vertical-align: -1px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* day label under the picker (tiny) */
+      .selected-date-line {
+        margin: 6px 0 10px;
+        font-size: 12px;
+        color: var(--muted);
       }
     </style>
   </head>
@@ -43,8 +190,8 @@
             <h1 class="title">
               Dashboard
               <span class="updated" id="updated">
-                <span class="dot" id="upd-dot"></span>
-                <span class="txt" id="upd-text">—</span>
+                <span class="spinner" id="upd-dot" aria-hidden="true"></span>
+                <span class="txt" id="upd-text">Loading…</span>
               </span>
             </h1>
             <p id="dateText" class="subtitle">—</p>
@@ -61,41 +208,82 @@
         </div>
       </div>
 
-      <!-- Week navigation -->
+      <!-- small, honest week nav -->
       <div class="week-nav">
-        <button id="prevWeek" title="Previous week">←</button>
+        <button id="prevWeek" class="week-btn" aria-label="Previous week">
+          ⟵
+        </button>
         <section id="week" class="week" aria-label="This week"></section>
-        <button id="nextWeek" title="Next week">→</button>
+        <button id="nextWeek" class="week-btn" aria-label="Next week">⟶</button>
+      </div>
+
+      <!-- selected-date: clickable to jump -->
+      <div class="selected-date-line">
+        <button id="pickDate" class="picked" title="Jump to date">
+          <span class="dot" aria-hidden="true"></span>
+          <span id="pickedText">—</span>
+        </button>
+        <input
+          id="dateInput"
+          type="date"
+          style="
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            width: 0;
+            height: 0;
+          "
+        />
       </div>
 
       <!-- KPIs -->
       <section class="grid">
-        <article id="kpiReservations" class="card">
-          <div class="label">Reservations</div>
-          <div class="value" data-value>—</div>
+        <article id="kpiReservations" class="card" aria-live="polite">
+          <div class="row">
+            <div>
+              <div class="label">Reservations</div>
+              <div class="value" data-value>—</div>
+            </div>
+          </div>
         </article>
-        <article id="kpiRevenue" class="card">
-          <div class="label">Revenue (USD)</div>
-          <div class="value" data-value>—</div>
+        <article id="kpiRevenue" class="card" aria-live="polite">
+          <div class="row">
+            <div>
+              <div class="label">Revenue (USD)</div>
+              <div class="value" data-value>—</div>
+            </div>
+          </div>
         </article>
-        <article id="kpiNights" class="card">
-          <div class="label">Nights</div>
-          <div class="value" data-value>—</div>
+        <article id="kpiNights" class="card" aria-live="polite">
+          <div class="row">
+            <div>
+              <div class="label">Nights</div>
+              <div class="value" data-value>—</div>
+            </div>
+          </div>
         </article>
-        <article id="kpiADR" class="card">
-          <div class="label">ADR</div>
-          <div class="value" data-value>—</div>
+        <article id="kpiADR" class="card" aria-live="polite">
+          <div class="row">
+            <div>
+              <div class="label">ADR</div>
+              <div class="value" data-value>—</div>
+            </div>
+          </div>
         </article>
-        <article id="kpiCancels" class="card">
-          <div class="label">Cancellations</div>
-          <div class="value" data-value>—</div>
+        <article id="kpiCancels" class="card" aria-live="polite">
+          <div class="row">
+            <div>
+              <div class="label">Cancellations</div>
+              <div class="value" data-value>—</div>
+            </div>
+          </div>
         </article>
       </section>
 
       <!-- Tables -->
       <div class="section-title">
         <h2>By Source</h2>
-        <span class="tag" id="tag-day">Today • Cairo TZ</span>
+        <span class="tag" id="tag-day">—</span>
       </div>
       <section class="table-card">
         <div class="table-scroll">
@@ -122,7 +310,7 @@
 
       <div class="section-title">
         <h2>By Nationality</h2>
-        <span class="tag">Today • Cairo TZ</span>
+        <span class="tag" id="tag-day-2">—</span>
       </div>
       <section class="table-card">
         <div class="table-scroll">
@@ -148,30 +336,38 @@
       </section>
 
       <div class="foot">
-        <span class="dot" aria-hidden="true"></span> Cairo time • USD • no fluff
+        <span class="dot" aria-hidden="true"></span> Cairo time • USD •
+        zero-dependency UI
       </div>
     </div>
 
     <script>
+      // no surprises: same API shape as before
       const API = (day) =>
         day ? `/api/stats?day=${encodeURIComponent(day)}` : "/api/stats";
       const AUTO_MS = 60000;
+
       const $date = document.getElementById("dateText");
       const $auto = document.getElementById("autoRefresh");
       const $week = document.getElementById("week");
-      const $tagDay = document.getElementById("tag-day");
       const $updDot = document.getElementById("upd-dot");
       const $updText = document.getElementById("upd-text");
-      let weekDays = [],
-        selectedIndex = -1,
-        currentBaseDate = new Date();
+      const $tagDay = document.getElementById("tag-day");
+      const $tagDay2 = document.getElementById("tag-day-2");
+      const $prev = document.getElementById("prevWeek");
+      const $next = document.getElementById("nextWeek");
+      const $pick = document.getElementById("pickDate");
+      const $input = document.getElementById("dateInput");
+      const $pickedText = document.getElementById("pickedText");
 
+      // numbers look nice, no wrap
       const intfmt = (n) => (Number(n) || 0).toLocaleString();
       const money = (n) =>
         (Number(n) || 0).toLocaleString(undefined, {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         });
+
       const fmtYMD = (d) =>
         [
           d.getFullYear(),
@@ -179,10 +375,17 @@
           String(d.getDate()).padStart(2, "0"),
         ].join("-");
       const startOfWeek = (date) => {
-        const d = new Date(date);
+        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
         d.setDate(d.getDate() - d.getDay());
         return d;
       };
+      const fmtLong = (d) =>
+        d.toLocaleDateString([], {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
 
       function setDateNow() {
         $date.textContent = new Date().toLocaleString([], {
@@ -208,6 +411,13 @@
         const el = document.querySelector(`#${id} [data-value]`);
         if (!el) return;
         el.textContent = fmt(value);
+        el.animate(
+          [
+            { transform: "translateY(2px)", opacity: 0.85 },
+            { transform: "translateY(0)", opacity: 1 },
+          ],
+          { duration: 250, easing: "cubic-bezier(.2,.8,.2,1)" }
+        );
       }
       function renderTable(rootId, mapObj, labelKey) {
         const root = document.getElementById(rootId);
@@ -221,20 +431,26 @@
           .map(([k, v]) => {
             const label = k && k !== "unknown" ? k : "Unknown";
             const adr = v.nights ? v.revenue / v.nights : 0;
-            return `<tr><td>${
+            return `<tr>
+            <td>${
               labelKey === "source"
                 ? label.replace(/\b\w/g, (c) => c.toUpperCase())
                 : label
-            }</td><td class="num">${intfmt(
-              v.reservationCount || 0
-            )}</td><td class="num">${intfmt(
-              v.nights || 0
-            )}</td><td class="num">$ ${money(
-              v.revenue || 0
-            )}</td><td class="num">$ ${money(adr)}</td></tr>`;
+            }</td>
+            <td class="num">${intfmt(v.reservationCount || 0)}</td>
+            <td class="num">${intfmt(v.nights || 0)}</td>
+            <td class="num">$ ${money(v.revenue || 0)}</td>
+            <td class="num">$ ${money(adr)}</td>
+          </tr>`;
           })
           .join("");
       }
+
+      // week model
+      let weekDays = []; // {date, ymd, label, stats, _maxRev}
+      let selectedIndex = -1;
+      let anchorDate = new Date(); // where the week is anchored
+      let forceSelectYMD = null; // when jumping via date picker
 
       function renderWeek() {
         $week.innerHTML = "";
@@ -242,59 +458,91 @@
           const col = document.createElement("div");
           col.className = "daycol" + (i === selectedIndex ? " active" : "");
           col.setAttribute("role", "button");
+          col.setAttribute("aria-label", d.ymd);
           col.tabIndex = 0;
+
           const stem = document.createElement("div");
           stem.className = "stem";
+
+          const rev = Number(d.stats?.stats?.all?.Revenue || 0);
           const dot = document.createElement("div");
           dot.className = "dot2";
+
+          // normalized dot height (zeros still show)
           const max = Number(d._maxRev || 0);
           const span = 72;
-          const ratio =
-            max > 0
-              ? Math.sqrt(d.stats?.stats?.all?.Revenue || 0) / Math.sqrt(max)
-              : 0;
+          const ratio = max > 0 ? Math.sqrt(rev) / Math.sqrt(max) : 0;
           const y = 80 - Math.round(span * ratio);
           dot.style.setProperty("--dotY", y + "%");
           stem.appendChild(dot);
+
           const label = document.createElement("div");
           label.className = "dlabel";
           label.textContent = d.label;
+
           col.appendChild(stem);
           col.appendChild(label);
+
           col.addEventListener("click", () => selectDay(i));
+          col.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              selectDay(i);
+            }
+          });
+
           $week.appendChild(col);
         });
       }
 
       function applyStats(dayObj) {
-        const s = dayObj?.stats?.stats?.all || {},
-          src = dayObj?.stats?.stats?.sources || {},
-          nat = dayObj?.stats?.stats?.nationalities || {};
+        const s = dayObj?.stats?.stats?.all || {};
+        const sources = dayObj?.stats?.stats?.sources || {};
+        const nationalities = dayObj?.stats?.stats?.nationalities || {};
+
         setKPI("kpiReservations", s.Reservations, intfmt);
         setKPI("kpiRevenue", s.Revenue, (v) => "$ " + money(v));
         setKPI("kpiNights", s.Nights, intfmt);
         setKPI("kpiADR", s.ADR, (v) => "$ " + money(v));
         setKPI("kpiCancels", s.Cancellations, intfmt);
-        renderTable("tbl-sources", src, "source");
-        renderTable("tbl-nations", nat, "nation");
-        $tagDay.textContent = `${s.Day || "—"} • Cairo TZ`;
+
+        renderTable("tbl-sources", sources, "source");
+        renderTable("tbl-nations", nationalities, "nation");
+
+        const tag = (s.Day || "—") + " • Cairo TZ";
+        $tagDay.textContent = tag;
+        $tagDay2.textContent = tag;
+
+        // selected date badge text
+        if (dayObj?.date) $pickedText.textContent = fmtLong(dayObj.date);
+
         setUpdatedLoading(false);
       }
+
       function selectDay(index) {
         selectedIndex = index;
         renderWeek();
         applyStats(weekDays[selectedIndex]);
       }
 
-      async function loadWeek(baseDate) {
+      async function loadWeek(baseDate = new Date()) {
+        anchorDate = new Date(
+          baseDate.getFullYear(),
+          baseDate.getMonth(),
+          baseDate.getDate()
+        );
         setDateNow();
         setUpdatedLoading(true, "Loading week…");
-        currentBaseDate = baseDate;
-        const start = startOfWeek(baseDate);
+
+        const start = startOfWeek(anchorDate);
         const labels = ["S", "M", "T", "W", "T", "F", "S"];
+
         weekDays = Array.from({ length: 7 }, (_, i) => {
-          const d = new Date(start);
-          d.setDate(start.getDate() + i);
+          const d = new Date(
+            start.getFullYear(),
+            start.getMonth(),
+            start.getDate() + i
+          );
           return {
             date: d,
             ymd: fmtYMD(d),
@@ -303,45 +551,68 @@
             _maxRev: 0,
           };
         });
+
+        // fetch all 7 days, no caching here – server handles it
         const res = await Promise.all(
           weekDays.map((d) =>
-            fetch(API(d.ymd))
+            fetch(API(d.ymd), { cache: "no-store" })
               .then((r) => r.json())
               .catch(() => null)
           )
         );
         res.forEach((json, i) => (weekDays[i].stats = json || {}));
+
         const maxRev = Math.max(
           0,
           ...weekDays.map((d) => Number(d.stats?.stats?.all?.Revenue || 0))
         );
         weekDays.forEach((d) => (d._maxRev = maxRev));
-        const todayStr = fmtYMD(new Date());
-        selectedIndex = weekDays.findIndex((d) => d.ymd === todayStr);
-        if (selectedIndex < 0) selectedIndex = 0;
+
+        // prefer forced selection (date picker), otherwise pick today if inside week, else first day
+        const targetYMD = forceSelectYMD || fmtYMD(new Date());
+        const idx = weekDays.findIndex((d) => d.ymd === targetYMD);
+        selectedIndex = idx >= 0 ? idx : 0;
+        forceSelectYMD = null;
+
         renderWeek();
         applyStats(weekDays[selectedIndex]);
       }
 
-      document.getElementById("prevWeek").onclick = () => {
-        const d = new Date(currentBaseDate);
+      // week arrows (simple)
+      $prev.addEventListener("click", () => {
+        const d = new Date(anchorDate);
         d.setDate(d.getDate() - 7);
+        forceSelectYMD = null; // follow week default
         loadWeek(d);
-      };
-      document.getElementById("nextWeek").onclick = () => {
-        const d = new Date(currentBaseDate);
+      });
+      $next.addEventListener("click", () => {
+        const d = new Date(anchorDate);
         d.setDate(d.getDate() + 7);
+        forceSelectYMD = null;
         loadWeek(d);
-      };
+      });
 
+      // date picker: click badge → open native picker → jump
+      $pick.addEventListener("click", () =>
+        $input.showPicker ? $input.showPicker() : $input.click()
+      );
+      $input.addEventListener("change", () => {
+        if (!$input.value) return;
+        forceSelectYMD = $input.value;
+        const parts = $input.value.split("-").map(Number);
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        loadWeek(d);
+      });
+
+      // Auto-refresh: only the selected day
       let timer = null;
-      $auto.onchange = (e) => {
+      $auto.addEventListener("change", (e) => {
         if (e.target.checked) {
           timer = setInterval(async () => {
             if (selectedIndex < 0) return;
             setUpdatedLoading(true, "Refreshing…");
             const d = weekDays[selectedIndex];
-            const json = await fetch(API(d.ymd))
+            const json = await fetch(API(d.ymd), { cache: "no-store" })
               .then((r) => r.json())
               .catch(() => null);
             if (json) {
@@ -355,15 +626,18 @@
               weekDays.forEach((x) => (x._maxRev = maxRev));
               renderWeek();
               applyStats(weekDays[selectedIndex]);
-            } else setUpdatedLoading(false);
+            } else {
+              setUpdatedLoading(false);
+            }
           }, AUTO_MS);
         } else {
           clearInterval(timer);
           timer = null;
         }
-      };
+      });
 
-      loadWeek(new Date());
+      // init
+      loadWeek();
     </script>
   </body>
 </html>
