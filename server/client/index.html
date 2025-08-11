@@ -187,10 +187,26 @@
         <div style="display: flex; gap: 12px; align-items: center">
           <div class="brand" aria-hidden="true"></div>
           <div>
-            <h1 class="title">
+            <h1
+              class="title"
+              style="display: flex; align-items: center; gap: 8px"
+            >
               Dashboard
-              <span class="updated" id="updated">
-                <span class="spinner" id="upd-dot" aria-hidden="true"></span>
+              <span
+                class="updated"
+                id="updated"
+                style="display: inline-flex; align-items: center; gap: 6px"
+              >
+                <span
+                  class="dot"
+                  id="upd-dot"
+                  style="
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 50%;
+                    background: var(--brand-2);
+                  "
+                ></span>
                 <span class="txt" id="upd-text">Loading…</span>
               </span>
             </h1>
