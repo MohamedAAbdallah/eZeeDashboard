@@ -1,14 +1,13 @@
 .week {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: 20px;
   padding: 16px 14px;
   border-radius: 18px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   backdrop-filter: var(--blur);
   box-shadow: var(--shadow);
-  margin-bottom: 18px;
 }
 .daycol {
   flex: 1;
