@@ -131,6 +131,13 @@ nav a.active {
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand-2) 25%, transparent);
 }
 
+.value,
+.num,
+.bubble {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
 /* Status */
 .status {
   margin: 12px 0 16px;
