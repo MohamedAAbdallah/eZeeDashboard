@@ -5,13 +5,12 @@
     <title>Today's Statistics</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      /* === Color Palette (unchanged) === */
+      /* === Palette (unchanged) === */
       :root {
         --brand: #c81f3c;
         --brand-2: #bb1b37;
         --accent: #4e1e42;
         --paper: #dfd0d2;
-
         --bg: #faf9fa;
         --panel: rgba(255, 255, 255, 0.85);
         --panel-border: color-mix(in oklab, var(--paper) 70%, #fff);
@@ -64,7 +63,6 @@
         justify-content: space-between;
         align-items: flex-end;
         gap: 16px;
-        margin-bottom: 16px;
         flex-wrap: wrap;
       }
       .title {
@@ -146,7 +144,7 @@
 
       /* status */
       .status {
-        margin: 12px 0 20px;
+        margin: 12px 0 16px;
         font-size: 13px;
         padding: 10px 12px;
         border-radius: 12px;
@@ -171,7 +169,95 @@
         );
       }
 
-      /* KPI cards */
+      /* week picker */
+      .week {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 16px 14px;
+        border-radius: 18px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        backdrop-filter: var(--blur);
+        box-shadow: var(--shadow);
+        margin-bottom: 18px;
+      }
+      .daycol {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .stem {
+        position: relative;
+        width: 2px;
+        height: 80px;
+        background: color-mix(in oklab, var(--muted) 28%, transparent);
+        border-radius: 999px;
+      }
+      .dot2 {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--accent) 45%, #7da1c8);
+        top: var(--dotY, 40%); /* dynamic */
+        box-shadow: 0 0 0 3px
+          color-mix(in oklab, var(--accent) 15%, transparent);
+      }
+      .dlabel {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        border: 1px solid var(--panel-border);
+        background: var(--panel);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .daycol.active .stem {
+        background: linear-gradient(
+          to top,
+          color-mix(in oklab, var(--brand-2) 40%, transparent),
+          color-mix(in oklab, var(--brand) 25%, transparent)
+        );
+        width: 10px;
+        border-radius: 999px;
+      }
+      .daycol.active .dlabel {
+        background: color-mix(in oklab, var(--brand-2) 14%, var(--panel));
+        color: var(--brand-2);
+        border-color: color-mix(
+          in oklab,
+          var(--brand-2) 40%,
+          var(--panel-border)
+        );
+      }
+      .bubble {
+        position: absolute;
+        top: -28px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #10131a;
+        color: #fff;
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+        white-space: nowrap;
+        display: none;
+      }
+      .daycol.active .bubble {
+        display: block;
+      }
+
+      /* KPIs */
       .grid {
         display: grid;
         gap: 14px;
@@ -303,7 +389,6 @@
         color: var(--muted);
       }
 
-      /* footer */
       .foot {
         margin: 18px 0 0;
         display: flex;
@@ -342,8 +427,11 @@
 
       <div id="status" class="status">Connecting to API…</div>
 
+      <!-- Week picker -->
+      <section id="week" class="week" aria-label="This week"></section>
+
       <!-- KPIs -->
-      <section class="grid" id="grid">
+      <section class="grid">
         <article id="kpiReservations" class="card" aria-live="polite">
           <div class="row">
             <div>
@@ -366,7 +454,6 @@
             </div>
           </div>
         </article>
-
         <article id="kpiRevenue" class="card" aria-live="polite">
           <div class="row">
             <div>
@@ -389,7 +476,6 @@
             </div>
           </div>
         </article>
-
         <article id="kpiNights" class="card" aria-live="polite">
           <div class="row">
             <div>
@@ -410,7 +496,6 @@
             </div>
           </div>
         </article>
-
         <article id="kpiADR" class="card" aria-live="polite">
           <div class="row">
             <div>
@@ -432,7 +517,6 @@
             </div>
           </div>
         </article>
-
         <article id="kpiCancels" class="card" aria-live="polite">
           <div class="row">
             <div>
@@ -459,7 +543,7 @@
       <!-- Tables -->
       <div class="section-title">
         <h2>By Source</h2>
-        <span class="tag">Today • Cairo TZ</span>
+        <span class="tag" id="tag-day">Today • Cairo TZ</span>
       </div>
       <section class="table-card">
         <div class="table-scroll">
@@ -512,19 +596,22 @@
       </section>
 
       <div class="foot">
-        <span class="dot" aria-hidden="true"></span>
-        Cairo time • USD • zero-dependency UI
+        <span class="dot" aria-hidden="true"></span> Cairo time • USD •
+        zero-dependency UI
       </div>
     </div>
 
     <script>
-      const API = "/api/stats";
+      const API = (day) =>
+        day ? `/api/stats?day=${encodeURIComponent(day)}` : "/api/stats";
       const AUTO_MS = 60000;
 
       const $status = document.getElementById("status");
       const $date = document.getElementById("dateText");
       const $auto = document.getElementById("autoRefresh");
       const $updated = document.getElementById("updated");
+      const $week = document.getElementById("week");
+      const $tagDay = document.getElementById("tag-day");
 
       const intfmt = (n) => (Number(n) || 0).toLocaleString();
       const money = (n) =>
@@ -532,6 +619,22 @@
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         });
+
+      // format YYYY-MM-DD using local time (no UTC shift)
+      const fmtYMD = (d) =>
+        [
+          d.getFullYear(),
+          String(d.getMonth() + 1).padStart(2, "0"),
+          String(d.getDate()).padStart(2, "0"),
+        ].join("-");
+
+      function startOfWeek(date) {
+        // Sunday -> Saturday
+        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const day = d.getDay(); // 0..6
+        d.setDate(d.getDate() - day);
+        return d;
+      }
 
       function setDateNow() {
         $date.textContent = new Date().toLocaleString([], {
@@ -561,7 +664,6 @@
           { duration: 250, easing: "cubic-bezier(.2,.8,.2,1)" }
         );
       }
-
       function renderTable(rootId, mapObj, labelKey) {
         const root = document.getElementById(rootId);
         const entries = Object.entries(mapObj || {});
@@ -569,74 +671,162 @@
           root.innerHTML = `<tr><td colspan="5" class="muted" style="padding:14px 12px">No data</td></tr>`;
           return;
         }
-        // sort by revenue desc
         entries.sort((a, b) => (b[1]?.revenue || 0) - (a[1]?.revenue || 0));
-
         root.innerHTML = entries
           .map(([k, v]) => {
             const label = k && k !== "unknown" ? k : "Unknown";
             const adr = v.nights || 0 ? v.revenue / v.nights : 0;
-            return `
-          <tr>
-            <td>${
-              labelKey === "source"
-                ? label.replace(/\b\w/g, (c) => c.toUpperCase())
-                : label
-            }</td>
-            <td class="num">${intfmt(v.reservationCount || 0)}</td>
-            <td class="num">${intfmt(v.nights || 0)}</td>
-            <td class="num">$ ${money(v.revenue || 0)}</td>
-            <td class="num">$ ${money(adr)}</td>
-          </tr>
-        `;
+            return `<tr>
+          <td>${
+            labelKey === "source"
+              ? label.replace(/\b\w/g, (c) => c.toUpperCase())
+              : label
+          }</td>
+          <td class="num">${intfmt(v.reservationCount || 0)}</td>
+          <td class="num">${intfmt(v.nights || 0)}</td>
+          <td class="num">$ ${money(v.revenue || 0)}</td>
+          <td class="num">$ ${money(adr)}</td>
+        </tr>`;
           })
           .join("");
       }
 
-      async function load() {
-        setDateNow();
-        $status.className = "status";
-        $status.textContent = "Refreshing…";
-        try {
-          const r = await fetch(API, { cache: "no-store" });
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          const json = await r.json();
-          const s = json?.stats?.all || {};
-          const sources = json?.stats?.sources || {};
-          const nationalities = json?.stats?.nationalities || {};
+      // --- Week UI ---
+      let weekDays = []; // [{date:Date, ymd, label, stats}]
+      let selectedIndex = -1;
 
-          setKPI("kpiReservations", s.Reservations, intfmt);
-          setKPI("kpiRevenue", s.Revenue, (v) => "$ " + money(v));
-          setKPI("kpiNights", s.Nights, intfmt);
-          setKPI("kpiADR", s.ADR, (v) => "$ " + money(v));
-          setKPI("kpiCancels", s.Cancellations, intfmt);
+      function renderWeek() {
+        $week.innerHTML = "";
+        weekDays.forEach((d, i) => {
+          const col = document.createElement("div");
+          col.className = "daycol" + (i === selectedIndex ? " active" : "");
+          col.setAttribute("role", "button");
+          col.setAttribute("aria-label", d.ymd);
+          col.tabIndex = 0;
 
-          renderTable("tbl-sources", sources, "source");
-          renderTable("tbl-nations", nationalities, "nation");
+          const stem = document.createElement("div");
+          stem.className = "stem";
 
-          setUpdatedBadge(); // time only
-          $status.textContent = `Day: ${s.Day || "—"}`;
-          $status.className = "status ok";
-        } catch (err) {
-          console.error(err);
-          $status.textContent = "Failed to load: " + (err?.message || err);
-          $status.className = "status err";
-        }
+          const bubble = document.createElement("div");
+          bubble.className = "bubble";
+          bubble.textContent = "$ " + money(d.stats?.stats?.all?.Revenue || 0);
+          stem.appendChild(bubble);
+
+          const dot = document.createElement("div");
+          dot.className = "dot2";
+          const rev = Number(d.stats?.stats?.all?.Revenue || 0);
+          const y = 80 - Math.min(72, Math.sqrt(rev)); // quick visual scale
+          dot.style.setProperty("--dotY", y + "%");
+          stem.appendChild(dot);
+
+          const label = document.createElement("div");
+          label.className = "dlabel";
+          label.textContent = d.label;
+
+          col.appendChild(stem);
+          col.appendChild(label);
+
+          col.addEventListener("click", () => selectDay(i));
+          col.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              selectDay(i);
+            }
+          });
+
+          $week.appendChild(col);
+        });
       }
 
-      // Auto-refresh toggle
+      function applyStats(dayObj) {
+        const s = dayObj?.stats?.stats?.all || {};
+        const sources = dayObj?.stats?.stats?.sources || {};
+        const nationalities = dayObj?.stats?.stats?.nationalities || {};
+
+        setKPI("kpiReservations", s.Reservations, intfmt);
+        setKPI("kpiRevenue", s.Revenue, (v) => "$ " + money(v));
+        setKPI("kpiNights", s.Nights, intfmt);
+        setKPI("kpiADR", s.ADR, (v) => "$ " + money(v));
+        setKPI("kpiCancels", s.Cancellations, intfmt);
+
+        renderTable("tbl-sources", sources, "source");
+        renderTable("tbl-nations", nationalities, "nation");
+
+        $tagDay.textContent = `${s.Day || "—"} • Cairo TZ`;
+        setUpdatedBadge(); // time only
+      }
+
+      function selectDay(index) {
+        selectedIndex = index;
+        renderWeek();
+        applyStats(weekDays[selectedIndex]);
+        $status.textContent = `Day: ${weekDays[selectedIndex].ymd}`;
+        $status.className = "status ok";
+      }
+
+      async function loadWeek(baseDate = new Date()) {
+        setDateNow();
+        $status.className = "status";
+        $status.textContent = "Loading week…";
+
+        const start = startOfWeek(baseDate);
+        const labels = ["S", "M", "T", "W", "T", "F", "S"];
+
+        weekDays = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(
+            start.getFullYear(),
+            start.getMonth(),
+            start.getDate() + i
+          );
+          return { date: d, ymd: fmtYMD(d), label: labels[i], stats: null };
+        });
+
+        // fetch all 7 days in parallel
+        const res = await Promise.all(
+          weekDays.map((d) =>
+            fetch(API(d.ymd), { cache: "no-store" })
+              .then((r) => r.json())
+              .catch(() => null)
+          )
+        );
+        res.forEach((json, i) => (weekDays[i].stats = json || {}));
+
+        // select today by default
+        const todayStr = fmtYMD(new Date());
+        const idx = weekDays.findIndex((d) => d.ymd === todayStr);
+        selectedIndex = idx >= 0 ? idx : 0;
+
+        renderWeek();
+        applyStats(weekDays[selectedIndex]);
+
+        $status.textContent = "Loaded";
+        $status.className = "status ok";
+      }
+
+      // Auto-refresh: refresh only the selected day + refresh its bubble value
       let timer = null;
-      $auto.addEventListener("change", (e) => {
+      document.getElementById("autoRefresh").addEventListener("change", (e) => {
         if (e.target.checked) {
-          timer = setInterval(load, AUTO_MS);
-          load();
+          timer = setInterval(async () => {
+            if (selectedIndex < 0) return;
+            const d = weekDays[selectedIndex];
+            const json = await fetch(API(d.ymd), { cache: "no-store" })
+              .then((r) => r.json())
+              .catch(() => null);
+            if (json) {
+              weekDays[selectedIndex].stats = json;
+              renderWeek(); // update bubble/dot
+              applyStats(weekDays[selectedIndex]);
+            }
+          }, AUTO_MS);
         } else {
           clearInterval(timer);
           timer = null;
         }
       });
 
-      load();
+      // init
+      loadWeek();
     </script>
   </body>
 </html>
