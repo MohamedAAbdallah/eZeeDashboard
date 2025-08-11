@@ -79,3 +79,9 @@
 .daycol.active .bubble {
   display: block;
 }
+#pickedText {
+  color: var(--paper);
+}
+.week-btn {
+  color: var(--paper);
+}
