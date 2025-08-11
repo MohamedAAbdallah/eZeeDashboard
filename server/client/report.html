@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Monthly Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      /* === Color Palette (same as stats) === */
+      :root {
+        --brand: #c81f3c;
+        --brand-2: #bb1b37;
+        --accent: #4e1e42;
+        --paper: #dfd0d2;
+        --bg: #faf9fa;
+        --panel: rgba(255, 255, 255, 0.85);
+        --panel-border: color-mix(in oklab, var(--paper) 70%, #fff);
+        --text: #1a1a1a;
+        --muted: color-mix(in oklab, var(--accent) 35%, #6b7280);
+        --shadow: 0 20px 40px -20px rgba(20, 10, 14, 0.25);
+        --blur: blur(10px);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #120914;
+          --panel: color-mix(in oklab, var(--accent) 26%, transparent);
+          --panel-border: color-mix(in oklab, var(--paper) 18%, #000);
+          --text: #f4f2f3;
+          --muted: color-mix(in oklab, var(--paper) 45%, #8791a1);
+          --shadow: 0 16px 40px -20px rgba(0, 0, 0, 0.6);
+        }
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        color: var(--text);
+        font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial,
+          sans-serif;
+        background: radial-gradient(
+            900px 500px at 10% -10%,
+            color-mix(in oklab, var(--brand) 15%, transparent),
+            transparent 55%
+          ),
+          radial-gradient(
+            700px 400px at 110% 10%,
+            color-mix(in oklab, var(--brand-2) 12%, transparent),
+            transparent 60%
+          ),
+          var(--bg);
+      }
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      .title {
+        margin: 0 0 6px;
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+      .subtitle {
+        margin: 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .brand {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        background: conic-gradient(
+          from 120deg,
+          var(--brand),
+          var(--brand-2),
+          var(--brand)
+        );
+        outline: 8px solid rgba(255, 255, 255, 0.35);
+        outline-offset: -6px;
+      }
+      nav a {
+        font-size: 12px;
+        color: var(--muted);
+        text-decoration: none;
+        margin-left: 12px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--panel-border);
+        background: var(--panel);
+        backdrop-filter: var(--blur);
+      }
+      nav a.active {
+        color: var(--brand-2);
+        border-color: color-mix(
+          in oklab,
+          var(--brand-2) 50%,
+          var(--panel-border)
+        );
+      }
+
+      .status {
+        margin: 12px 0 20px;
+        font-size: 13px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        backdrop-filter: var(--blur);
+      }
+      .status.ok {
+        color: color-mix(in oklab, var(--brand-2) 65%, #0f0f0f);
+        border-color: color-mix(
+          in oklab,
+          var(--brand-2) 50%,
+          var(--panel-border)
+        );
+      }
+      .status.err {
+        color: color-mix(in oklab, var(--brand) 75%, #1a1a1a);
+        border-color: color-mix(
+          in oklab,
+          var(--brand) 55%,
+          var(--panel-border)
+        );
+      }
+
+      .grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 560px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .card {
+        border-radius: 18px;
+        padding: 18px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        backdrop-filter: var(--blur);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .label {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .value {
+        margin-top: 8px;
+        font-weight: 800;
+        font-size: 28px;
+        letter-spacing: -0.02em;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      /* Calendar panel */
+      .calendar {
+        margin-top: 16px;
+        border-radius: 18px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        backdrop-filter: var(--blur);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .cal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px;
+        border-bottom: 1px solid var(--panel-border);
+      }
+      .cal-body {
+        overflow: auto;
+      }
+      .cal-table {
+        min-width: 760px;
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+      }
+      .cal-table th,
+      .cal-table td {
+        padding: 8px 6px;
+        border-bottom: 1px solid
+          color-mix(in oklab, var(--panel-border) 70%, transparent);
+      }
+      .cal-table thead th {
+        position: sticky;
+        top: 0;
+        background: var(--panel);
+        backdrop-filter: var(--blur);
+        z-index: 1;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .room-col {
+        position: sticky;
+        left: 0;
+        background: var(--panel);
+        backdrop-filter: var(--blur);
+        z-index: 1;
+        min-width: 170px;
+      }
+      .room-name {
+        font-size: 12px;
+        color: #5b4456;
+      }
+      .cell {
+        height: 16px;
+        width: 22px;
+        border-radius: 6px;
+        background: color-mix(in oklab, var(--muted) 15%, transparent);
+        border: 1px solid rgba(0, 0, 0, 0.04);
+        display: inline-block;
+      }
+      .cell.booked {
+        background: color-mix(in oklab, var(--brand) 22%, var(--paper));
+        border-color: color-mix(in oklab, var(--brand) 40%, transparent);
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .month-input {
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--panel-border);
+        background: var(--panel);
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="header">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div class="brand" aria-hidden="true"></div>
+          <div>
+            <h1 class="title">Monthly Report</h1>
+            <p id="subtitle" class="subtitle">—</p>
+          </div>
+        </div>
+        <nav>
+          <a href="/dashboard">Stats</a>
+          <a class="active" href="/report.html">Report</a>
+        </nav>
+      </div>
+
+      <div id="status" class="status">Loading…</div>
+
+      <!-- Summary cards -->
+      <section class="grid">
+        <article class="card">
+          <div class="label">Month</div>
+          <div class="value" id="v-month">—</div>
+          <div class="muted" id="v-days">— days</div>
+        </article>
+        <article class="card">
+          <div class="label">Total Nights</div>
+          <div class="value" id="v-nights">—</div>
+          <div class="muted">Sum of booked nights</div>
+        </article>
+        <article class="card">
+          <div class="label">Total Revenue (USD)</div>
+          <div class="value" id="v-revenue">—</div>
+          <div class="muted">Across all room types</div>
+        </article>
+        <article class="card">
+          <div class="label">Room Types</div>
+          <div class="value" id="v-rooms">—</div>
+          <div class="muted">Distinct room types in data</div>
+        </article>
+      </section>
+
+      <!-- Calendar -->
+      <section class="calendar">
+        <div class="cal-head">
+          <strong class="muted">Calendar</strong>
+          <div class="toolbar">
+            <label class="muted" for="month">Month</label>
+            <input id="month" class="month-input" type="month" />
+          </div>
+        </div>
+        <div class="cal-body">
+          <table class="cal-table" id="cal">
+            <thead>
+              <tr id="cal-head-row"></tr>
+            </thead>
+            <tbody id="cal-body-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <p class="muted" style="margin-top: 14px">
+        Each filled cell indicates a booked night for that room type on that
+        date.
+      </p>
+    </div>
+
+    <script>
+      const API = (m) => `/api/report?month=${encodeURIComponent(m)}`;
+      const $status = document.getElementById("status");
+      const $subtitle = document.getElementById("subtitle");
+      const $monthIn = document.getElementById("month");
+      const $headRow = document.getElementById("cal-head-row");
+      const $bodyRows = document.getElementById("cal-body-rows");
+
+      const money = (n) =>
+        (Number(n) || 0).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+      const intfmt = (n) => (Number(n) || 0).toLocaleString();
+
+      function defaultMonth() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+          2,
+          "0"
+        )}`;
+      }
+
+      function setSummary(summary) {
+        document.getElementById("v-month").textContent = summary.month;
+        document.getElementById(
+          "v-days"
+        ).textContent = `${summary.daysInMonth} days`;
+        document.getElementById("v-nights").textContent = intfmt(
+          summary.totalNights
+        );
+        document.getElementById("v-revenue").textContent =
+          "$ " + money(summary.totalRevenue);
+        document.getElementById("v-rooms").textContent = intfmt(
+          summary.totalRooms
+        );
+        $subtitle.textContent = `Overview for ${summary.month}`;
+      }
+
+      function buildHead(daysInMonth) {
+        $headRow.innerHTML = "";
+        const thRoom = document.createElement("th");
+        thRoom.className = "room-col";
+        thRoom.textContent = "Room Type";
+        $headRow.appendChild(thRoom);
+
+        for (let d = 1; d <= daysInMonth; d++) {
+          const th = document.createElement("th");
+          th.textContent = d;
+          $headRow.appendChild(th);
+        }
+      }
+
+      function buildRows(rooms, daysInMonth) {
+        $bodyRows.innerHTML = "";
+        const codes = Object.keys(rooms).sort((a, b) => {
+          const A = (rooms[a].name || a).toLowerCase();
+          const B = (rooms[b].name || b).toLowerCase();
+          return A.localeCompare(B);
+        });
+
+        for (const code of codes) {
+          const rt = rooms[code];
+          const tr = document.createElement("tr");
+
+          const tdName = document.createElement("td");
+          tdName.className = "room-col";
+          const nm = document.createElement("div");
+          nm.className = "room-name";
+          nm.textContent = rt.name || code;
+          tdName.appendChild(nm);
+          tr.appendChild(tdName);
+
+          for (let i = 0; i < daysInMonth; i++) {
+            const td = document.createElement("td");
+            const cell = document.createElement("span");
+            cell.className = "cell" + (rt.days[i]?.booked ? " booked" : "");
+            td.appendChild(cell);
+            tr.appendChild(td);
+          }
+          $bodyRows.appendChild(tr);
+        }
+      }
+
+      async function load(monthStr) {
+        $status.className = "status";
+        $status.textContent = "Loading…";
+        try {
+          const r = await fetch(API(monthStr), { cache: "no-store" });
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          const json = await r.json();
+          const report = json?.report;
+          if (!report) throw new Error("Bad payload");
+
+          setSummary(report.summary);
+          buildHead(report.summary.daysInMonth);
+          buildRows(report.calendar.rooms || {}, report.summary.daysInMonth);
+
+          $status.textContent = "Loaded";
+          $status.className = "status ok";
+        } catch (err) {
+          console.error(err);
+          $status.textContent = "Failed to load: " + (err?.message || err);
+          $status.className = "status err";
+        }
+      }
+
+      // init
+      const m0 = defaultMonth();
+      $monthIn.value = m0;
+      load(m0);
+
+      $monthIn.addEventListener("change", (e) => {
+        const v = e.target.value;
+        if (v && /^\d{4}-\d{2}$/.test(v)) load(v);
+      });
+    </script>
+  </body>
+</html>

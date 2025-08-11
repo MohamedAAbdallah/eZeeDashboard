@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Today's Statistics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      /* === Color Palette (unchanged) === */
+      :root {
+        --brand: #c81f3c;
+        --brand-2: #bb1b37;
+        --accent: #4e1e42;
+        --paper: #dfd0d2;
+
+        --bg: #faf9fa;
+        --panel: rgba(255, 255, 255, 0.85);
+        --panel-border: color-mix(in oklab, var(--paper) 70%, #fff);
+        --text: #1a1a1a;
+        --muted: color-mix(in oklab, var(--accent) 35%, #6b7280);
+        --shadow: 0 20px 40px -20px rgba(20, 10, 14, 0.25);
+        --blur: blur(10px);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #120914;
+          --panel: color-mix(in oklab, var(--accent) 26%, transparent);
+          --panel-border: color-mix(in oklab, var(--paper) 18%, #000);
+          --text: #f4f2f3;
+          --muted: color-mix(in oklab, var(--paper) 45%, #8791a1);
+          --shadow: 0 16px 40px -20px rgba(0, 0, 0, 0.6);
+        }
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        color: var(--text);
+        font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial,
+          sans-serif;
+        background: radial-gradient(
+            900px 500px at 10% -10%,
+            color-mix(in oklab, var(--brand) 15%, transparent),
+            transparent 55%
+          ),
+          radial-gradient(
+            700px 400px at 110% 10%,
+            color-mix(in oklab, var(--brand-2) 12%, transparent),
+            transparent 60%
+          ),
+          var(--bg);
+      }
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      .title {
+        margin: 0 0 6px;
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+      .subtitle {
+        margin: 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .brand {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        background: conic-gradient(
+          from 120deg,
+          var(--brand),
+          var(--brand-2),
+          var(--brand)
+        );
+        outline: 8px solid rgba(255, 255, 255, 0.35);
+        outline-offset: -6px;
+      }
+      nav a {
+        font-size: 12px;
+        color: var(--muted);
+        text-decoration: none;
+        margin-left: 12px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--panel-border);
+        background: var(--panel);
+        backdrop-filter: var(--blur);
+      }
+      nav a.active {
+        color: var(--brand-2);
+        border-color: color-mix(
+          in oklab,
+          var(--brand-2) 50%,
+          var(--panel-border)
+        );
+      }
+
+      .status {
+        margin: 12px 0 20px;
+        font-size: 13px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        backdrop-filter: var(--blur);
+      }
+      .status.ok {
+        color: color-mix(in oklab, var(--brand-2) 65%, #0f0f0f);
+        border-color: color-mix(
+          in oklab,
+          var(--brand-2) 50%,
+          var(--panel-border)
+        );
+      }
+      .status.err {
+        color: color-mix(in oklab, var(--brand) 75%, #1a1a1a);
+        border-color: color-mix(
+          in oklab,
+          var(--brand) 55%,
+          var(--panel-border)
+        );
+      }
+
+      .grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+      }
+      @media (min-width: 600px) {
+        .grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (min-width: 900px) {
+        .grid {
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+      }
+
+      .card {
+        border-radius: 18px;
+        padding: 18px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        backdrop-filter: var(--blur);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .label {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .value {
+        margin-top: 8px;
+        font-weight: 800;
+        font-size: 32px;
+        letter-spacing: -0.02em;
+      }
+      .badge {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: color-mix(in oklab, var(--brand) 15%, transparent);
+        color: var(--brand);
+      }
+      .badge.alt {
+        background: color-mix(in oklab, var(--brand-2) 18%, transparent);
+        color: var(--brand-2);
+      }
+      .badge.accent {
+        background: color-mix(in oklab, var(--accent) 22%, transparent);
+        color: var(--accent);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .barwrap {
+        margin-top: 12px;
+        height: 8px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--muted) 18%, transparent);
+        overflow: hidden;
+      }
+      .barfill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--brand-2), var(--brand));
+        transition: width 0.8s ease;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        user-select: none;
+      }
+      .switch input {
+        inline-size: 16px;
+        block-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="header">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div class="brand" aria-hidden="true"></div>
+          <div>
+            <h1 class="title">Today's Statistics</h1>
+            <p id="dateText" class="subtitle">—</p>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <label class="switch" title="Refresh automatically every 60 seconds">
+            <input id="autoRefresh" type="checkbox" /> Auto-refresh (60s)
+          </label>
+          <nav>
+            <a class="active" href="/dashboard">Stats</a>
+            <a href="/report.html">Report</a>
+          </nav>
+        </div>
+      </div>
+
+      <div id="status" class="status">Connecting to API…</div>
+
+      <section class="grid">
+        <article id="kpiReservations" class="card" aria-live="polite">
+          <div class="row">
+            <div>
+              <div class="label">Reservations</div>
+              <div class="value" data-value>—</div>
+            </div>
+            <div class="badge" aria-hidden="true">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M8 2v4M16 2v4M3 10h18M4 6h16a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z"
+                />
+              </svg>
+            </div>
+          </div>
+        </article>
+
+        <article id="kpiRevenue" class="card" aria-live="polite">
+          <div class="row">
+            <div>
+              <div class="label">Revenue (USD)</div>
+              <div class="value" data-value>—</div>
+            </div>
+            <div class="badge alt" aria-hidden="true">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M12 1v22M17 5a4 4 0 0 0-4-2H9a3 3 0 1 0 0 6h6a3 3 0 1 1 0 6H7a4 4 0 0 1-4-4"
+                />
+              </svg>
+            </div>
+          </div>
+          <div class="barwrap"><div id="revBar" class="barfill"></div></div>
+        </article>
+
+        <article id="kpiNights" class="card" aria-live="polite">
+          <div class="row">
+            <div>
+              <div class="label">Nights</div>
+              <div class="value" data-value>—</div>
+            </div>
+            <div class="badge accent" aria-hidden="true">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79Z" />
+              </svg>
+            </div>
+          </div>
+        </article>
+
+        <article id="kpiADR" class="card" aria-live="polite">
+          <div class="row">
+            <div>
+              <div class="label">ADR</div>
+              <div class="value" data-value>—</div>
+            </div>
+            <div class="badge" aria-hidden="true">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M12 3a9 9 0 1 0 9 9h-4" />
+                <path d="M12 7v5l3 3" />
+              </svg>
+            </div>
+          </div>
+        </article>
+
+        <article id="kpiCancels" class="card" aria-live="polite">
+          <div class="row">
+            <div>
+              <div class="label">Cancellations</div>
+              <div class="value" data-value>—</div>
+            </div>
+            <div class="badge alt" aria-hidden="true">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M3 3l18 18M19 5l-7 7" />
+                <circle cx="12" cy="12" r="10"></circle>
+              </svg>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <p class="muted" style="margin-top: 14px">
+        Values are formatted client-side. Source currency: USD.
+      </p>
+    </div>
+
+    <script>
+      const API = "/api/stats";
+      const AUTO_MS = 60000;
+      const $status = document.getElementById("status");
+      const $date = document.getElementById("dateText");
+      const $auto = document.getElementById("autoRefresh");
+
+      const intfmt = (n) => (Number(n) || 0).toLocaleString();
+      const money = (n) =>
+        (Number(n) || 0).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+
+      function setDateNow() {
+        $date.textContent = new Date().toLocaleString([], {
+          dateStyle: "full",
+          timeStyle: "short",
+        });
+      }
+      function setKPI(id, value, fmt = (v) => v) {
+        const el = document.querySelector(`#${id} [data-value]`);
+        if (!el) return;
+        el.textContent = fmt(value);
+        el.animate(
+          [
+            { transform: "translateY(2px)", opacity: 0.85 },
+            { transform: "translateY(0)", opacity: 1 },
+          ],
+          { duration: 250, easing: "cubic-bezier(.2,.8,.2,1)" }
+        );
+      }
+      function setRevBar(n) {
+        const pct = Math.max(
+          0,
+          Math.min(100, Math.round(((Number(n) || 0) / 2000) * 100))
+        );
+        requestAnimationFrame(() => {
+          document.getElementById("revBar").style.width = pct + "%";
+        });
+      }
+
+      async function load() {
+        setDateNow();
+        $status.className = "status";
+        $status.textContent = "Refreshing…";
+        try {
+          const r = await fetch(API, { cache: "no-store" });
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          const json = await r.json();
+          const s = json?.stats?.all || {};
+
+          setKPI("kpiReservations", s.Reservations, intfmt);
+          setKPI("kpiRevenue", s.Revenue, (v) => "$ " + money(v));
+          setKPI("kpiNights", s.Nights, intfmt);
+          setKPI("kpiADR", s.ADR, (v) => "$ " + money(v));
+          setKPI("kpiCancels", s.Cancellations, intfmt);
+          setRevBar(s.Revenue);
+
+          $status.textContent = `Last updated just now (Day: ${s.Day || "—"})`;
+          $status.className = "status ok";
+        } catch (err) {
+          console.error(err);
+          $status.textContent = "Failed to load: " + (err?.message || err);
+          $status.className = "status err";
+        }
+      }
+
+      // Auto-refresh toggle
+      let timer = null;
+      $auto.addEventListener("change", (e) => {
+        if (e.target.checked) {
+          timer = setInterval(load, AUTO_MS);
+          load();
+        } else {
+          clearInterval(timer);
+          timer = null;
+        }
+      });
+
+      load();
+    </script>
+  </body>
+</html>
