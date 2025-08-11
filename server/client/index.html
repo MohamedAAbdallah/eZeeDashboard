@@ -57,12 +57,15 @@
         margin: 0 auto;
         padding: 24px;
       }
+
+      /* header */
       .header {
         display: flex;
         justify-content: space-between;
         align-items: flex-end;
         gap: 16px;
         margin-bottom: 16px;
+        flex-wrap: wrap;
       }
       .title {
         margin: 0 0 6px;
@@ -108,7 +111,40 @@
           var(--panel-border)
         );
       }
+      .switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        user-select: none;
+      }
+      .switch input {
+        inline-size: 16px;
+        block-size: 16px;
+      }
+      .updated {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--muted);
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        backdrop-filter: var(--blur);
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--brand-2);
+        box-shadow: 0 0 0 3px
+          color-mix(in oklab, var(--brand-2) 25%, transparent);
+      }
 
+      /* status */
       .status {
         margin: 12px 0 20px;
         font-size: 13px;
@@ -135,6 +171,7 @@
         );
       }
 
+      /* KPI cards */
       .grid {
         display: grid;
         gap: 14px;
@@ -150,7 +187,6 @@
           grid-template-columns: repeat(5, minmax(0, 1fr));
         }
       }
-
       .card {
         border-radius: 18px;
         padding: 18px;
@@ -196,35 +232,85 @@
         gap: 12px;
       }
 
-      .barwrap {
-        margin-top: 12px;
-        height: 8px;
-        border-radius: 999px;
-        background: color-mix(in oklab, var(--muted) 18%, transparent);
+      /* tables */
+      .section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 22px 0 10px;
+      }
+      .section-title h2 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: var(--accent);
+      }
+      .table-card {
+        border-radius: 18px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        backdrop-filter: var(--blur);
+        box-shadow: var(--shadow);
         overflow: hidden;
       }
-      .barfill {
-        height: 100%;
-        width: 0%;
-        background: linear-gradient(90deg, var(--brand-2), var(--brand));
-        transition: width 0.8s ease;
+      .table-scroll {
+        overflow: auto;
       }
-
-      .muted {
-        color: var(--muted);
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        min-width: 560px;
+      }
+      thead th {
+        position: sticky;
+        top: 0;
+        background: var(--panel);
+        backdrop-filter: var(--blur);
+        z-index: 1;
+        padding: 10px 12px;
         font-size: 12px;
+        color: var(--muted);
+        text-align: left;
+        border-bottom: 1px solid
+          color-mix(in oklab, var(--panel-border) 70%, transparent);
       }
-      .switch {
+      tbody td {
+        padding: 10px 12px;
+        border-bottom: 1px solid
+          color-mix(in oklab, var(--panel-border) 70%, transparent);
+        font-size: 13px;
+      }
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+      .num {
+        text-align: right;
+        white-space: nowrap;
+      }
+      .tag {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        font-size: 12px;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--panel-border);
+        background: var(--panel);
+        backdrop-filter: var(--blur);
+        font-size: 11px;
         color: var(--muted);
-        user-select: none;
       }
-      .switch input {
-        inline-size: 16px;
-        block-size: 16px;
+
+      /* footer */
+      .foot {
+        margin: 18px 0 0;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 12px;
       }
     </style>
   </head>
@@ -234,7 +320,12 @@
         <div style="display: flex; gap: 12px; align-items: center">
           <div class="brand" aria-hidden="true"></div>
           <div>
-            <h1 class="title">Today's Statistics</h1>
+            <h1 class="title">
+              Today's Statistics
+              <span class="updated" id="updated"
+                ><span class="dot"></span><span>—</span></span
+              >
+            </h1>
             <p id="dateText" class="subtitle">—</p>
           </div>
         </div>
@@ -251,7 +342,8 @@
 
       <div id="status" class="status">Connecting to API…</div>
 
-      <section class="grid">
+      <!-- KPIs -->
+      <section class="grid" id="grid">
         <article id="kpiReservations" class="card" aria-live="polite">
           <div class="row">
             <div>
@@ -296,7 +388,6 @@
               </svg>
             </div>
           </div>
-          <div class="barwrap"><div id="revBar" class="barfill"></div></div>
         </article>
 
         <article id="kpiNights" class="card" aria-live="polite">
@@ -365,17 +456,75 @@
         </article>
       </section>
 
-      <p class="muted" style="margin-top: 14px">
-        Values are formatted client-side. Source currency: USD.
-      </p>
+      <!-- Tables -->
+      <div class="section-title">
+        <h2>By Source</h2>
+        <span class="tag">Today • Cairo TZ</span>
+      </div>
+      <section class="table-card">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th class="num">Reservations</th>
+                <th class="num">Nights</th>
+                <th class="num">Revenue (USD)</th>
+                <th class="num">ADR</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-sources">
+              <tr>
+                <td colspan="5" class="muted" style="padding: 14px 12px">
+                  No data
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="section-title">
+        <h2>By Nationality</h2>
+        <span class="tag">Today • Cairo TZ</span>
+      </div>
+      <section class="table-card">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Nationality</th>
+                <th class="num">Reservations</th>
+                <th class="num">Nights</th>
+                <th class="num">Revenue (USD)</th>
+                <th class="num">ADR</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-nations">
+              <tr>
+                <td colspan="5" class="muted" style="padding: 14px 12px">
+                  No data
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="foot">
+        <span class="dot" aria-hidden="true"></span>
+        Cairo time • USD • zero-dependency UI
+      </div>
     </div>
 
     <script>
       const API = "/api/stats";
       const AUTO_MS = 60000;
+
       const $status = document.getElementById("status");
       const $date = document.getElementById("dateText");
       const $auto = document.getElementById("autoRefresh");
+      const $updated = document.getElementById("updated");
 
       const intfmt = (n) => (Number(n) || 0).toLocaleString();
       const money = (n) =>
@@ -390,6 +539,16 @@
           timeStyle: "short",
         });
       }
+      function setUpdatedBadge(dt) {
+        const t =
+          typeof dt === "string"
+            ? dt
+            : new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+        $updated.querySelector("span:last-child").textContent = `Updated ${t}`;
+      }
       function setKPI(id, value, fmt = (v) => v) {
         const el = document.querySelector(`#${id} [data-value]`);
         if (!el) return;
@@ -402,14 +561,36 @@
           { duration: 250, easing: "cubic-bezier(.2,.8,.2,1)" }
         );
       }
-      function setRevBar(n) {
-        const pct = Math.max(
-          0,
-          Math.min(100, Math.round(((Number(n) || 0) / 2000) * 100))
-        );
-        requestAnimationFrame(() => {
-          document.getElementById("revBar").style.width = pct + "%";
-        });
+
+      function renderTable(rootId, mapObj, labelKey) {
+        const root = document.getElementById(rootId);
+        const entries = Object.entries(mapObj || {});
+        if (!entries.length) {
+          root.innerHTML = `<tr><td colspan="5" class="muted" style="padding:14px 12px">No data</td></tr>`;
+          return;
+        }
+        // sort by revenue desc
+        entries.sort((a, b) => (b[1]?.revenue || 0) - (a[1]?.revenue || 0));
+
+        root.innerHTML = entries
+          .map(([k, v]) => {
+            const label = k && k !== "unknown" ? k : "Unknown";
+            const adr = v.nights || 0 ? v.revenue / v.nights : 0;
+            return `
+          <tr>
+            <td>${
+              labelKey === "source"
+                ? label.replace(/\b\w/g, (c) => c.toUpperCase())
+                : label
+            }</td>
+            <td class="num">${intfmt(v.reservationCount || 0)}</td>
+            <td class="num">${intfmt(v.nights || 0)}</td>
+            <td class="num">$ ${money(v.revenue || 0)}</td>
+            <td class="num">$ ${money(adr)}</td>
+          </tr>
+        `;
+          })
+          .join("");
       }
 
       async function load() {
@@ -421,15 +602,20 @@
           if (!r.ok) throw new Error("HTTP " + r.status);
           const json = await r.json();
           const s = json?.stats?.all || {};
+          const sources = json?.stats?.sources || {};
+          const nationalities = json?.stats?.nationalities || {};
 
           setKPI("kpiReservations", s.Reservations, intfmt);
           setKPI("kpiRevenue", s.Revenue, (v) => "$ " + money(v));
           setKPI("kpiNights", s.Nights, intfmt);
           setKPI("kpiADR", s.ADR, (v) => "$ " + money(v));
           setKPI("kpiCancels", s.Cancellations, intfmt);
-          setRevBar(s.Revenue);
 
-          $status.textContent = `Last updated just now (Day: ${s.Day || "—"})`;
+          renderTable("tbl-sources", sources, "source");
+          renderTable("tbl-nations", nationalities, "nation");
+
+          setUpdatedBadge(); // time only
+          $status.textContent = `Day: ${s.Day || "—"}`;
           $status.className = "status ok";
         } catch (err) {
           console.error(err);
