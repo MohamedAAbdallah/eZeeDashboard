@@ -27,11 +27,6 @@ app.get("/dashboard", (_req, res) => {
 
 // Helpers
 const timeoutMs = (Number(process.env.CACHE_TIMEOUT) || 0) * 1000;
-const normKey = (v) => {
-  if (typeof v !== "string") return "unknown";
-  const t = v.trim();
-  return t ? t.toLowerCase() : "unknown";
-};
 const todayISOcairo = () =>
   new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" }); // YYYY-MM-DD
 
@@ -49,80 +44,74 @@ const getMonthParam = (req) => {
   return today.slice(0, 7); // YYYY-MM
 };
 
-async function fetchData() {
-  // 1) Try cache
+// ---- simple cache (per-day) ----
+const cachePath = path.join(__dirname, "cache.json");
+function readCache() {
   try {
-    const raw = fs.readFileSync("./server/cache.json", "utf-8");
-    if (raw) {
-      try {
-        const cacheObj = JSON.parse(raw);
-        if (cacheObj.timestamp && Date.now() - cacheObj.timestamp < timeoutMs) {
-          console.log(
-            `Used Cache ts=${cacheObj.timestamp} now=${Date.now()} diff=${
-              Date.now() - cacheObj.timestamp
-            }`
-          );
-          return cacheObj.data; // return cached payload
-        }
-      } catch (e) {
-        console.warn("Error parsing cache:", e);
-      }
-    }
+    const raw = fs.readFileSync(cachePath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return { byDay: {} };
+  }
+}
+function writeCache(obj) {
+  try {
+    fs.writeFileSync(cachePath, JSON.stringify(obj, null, 2));
   } catch (e) {
-    // this is expected for dry runs.
-    console.warn("Error reading cache:", e);
+    console.error("[cache] write failed:", e.message);
+  }
+}
+
+// ---- Booking List (working endpoint from test.js) ----
+// GET  [LIST_BASE]/booking/reservation_api/listing.php? + params
+async function fetchBookingListDay(day) {
+  // cache hit?
+  const store = readCache();
+  const hit = store.byDay?.[day];
+  if (hit && hit.timestamp && Date.now() - hit.timestamp < timeoutMs) {
+    console.log(`[cache] hit for ${day}`);
+    return hit.data;
   }
 
-  // 2) Fetch upstream
-  const r = await fetch(process.env.END_POINT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      RES_Request: {
-        Request_Type: "Bookings",
-        Authentication: {
-          HotelCode: process.env.HOTEL_CODE,
-          AuthCode: process.env.AUTH_CODE,
-        },
-      },
-    }),
-  });
+  console.log(`[fetch] BookingList for ${day}`);
+  const base = process.env.LIST_BASE || "https://live.ipms247.com/";
+  const url = new URL("booking/reservation_api/listing.php", base);
+  url.searchParams.set("request_type", "BookingList");
+  url.searchParams.set("HotelCode", process.env.HOTEL_CODE || "");
+  url.searchParams.set(
+    "APIKey",
+    process.env.API_KEY || process.env.AUTH_CODE || ""
+  );
+  url.searchParams.set("arrival_from", day);
+  url.searchParams.set("arrival_to", day);
+  url.searchParams.set("EmailId", ""); // per docs can be empty for “all”
 
+  const r = await fetch(url.toString(), { method: "GET" });
+  const text = await r.text();
   if (!r.ok) {
-    // FUTURE_TODO: Implement cache fallback if no upstream
-    //             Use CACHE_ERROR_TIMEOUT to determine fallback duration
-    const errorText = await r.text().catch(() => "");
-    console.error("VENDOR API Error Details:", errorText);
-    throw new Error(
-      `Upstream error (${r.status}): ${errorText || r.statusText}`
-    );
+    console.error("[fetch] vendor error:", text.slice(0, 200));
+    throw new Error(`Upstream error (${r.status}): ${r.statusText}`);
   }
 
-  const data = await r.json();
-
-  // 3) Write cache (fire-and-forget)
+  let data;
   try {
-    const cacheObj = { timestamp: Date.now(), data };
-    console.log(`Updated Cache: ${cacheObj.timestamp}`);
-    fs.writeFile("./cache.json", JSON.stringify(cacheObj), (err) => {
-      if (err) console.error("Error writing cache to disk:", err);
-    });
+    data = JSON.parse(text);
   } catch (e) {
-    console.error("Error scheduling cache write:", e);
+    console.error("[fetch] invalid JSON from vendor");
+    throw new Error("Invalid JSON response from vendor");
   }
+
+  // store cache
+  store.byDay = store.byDay || {};
+  store.byDay[day] = { timestamp: Date.now(), data };
+  writeCache(store);
 
   return data; // return fresh payload
 }
 
 // Core daily computation
 function computeDailyStats(data, day) {
-  const Reservations = data?.Reservations || {};
-  const Reservation = Array.isArray(Reservations?.Reservation)
-    ? Reservations.Reservation
-    : [];
-  const CancelReservation = Array.isArray(Reservations?.CancelReservation)
-    ? Reservations.CancelReservation
-    : [];
+  const list = Array.isArray(data?.BookingList) ? data.BookingList : [];
 
   let reservationCount = 0;
   let revenue = 0;
@@ -133,58 +122,47 @@ function computeDailyStats(data, day) {
   const sources = {};
   const nationalities = {};
 
-  // Bookings (per-day)
-  for (const r of Reservation) {
-    const trans = Array.isArray(r?.BookingTran) ? r.BookingTran : [];
-    for (const b of trans) {
-      const rental = Array.isArray(b?.RentalInfo) ? b.RentalInfo : [];
-      let hadDayRow = false;
+  for (const b of list) {
+    // filter for the selected day (arrival-based)
+    const arrival = (b?.ArrivalDate || "").trim();
+    if (arrival !== day) continue;
 
-      for (const ri of rental) {
-        if ((ri?.EffectiveDate || "").trim() === day) {
-          hadDayRow = true;
-          const rent = Number(ri?.Rent) || 0;
-          revenue += rent;
-          nights += 1;
+    reservationCount += 1;
 
-          // groupings by Source/Nationality for the same day
-          const sourceKey = normKey(b?.Source);
-          if (!sources[sourceKey]) {
-            sources[sourceKey] = {
-              reservationCount: 0,
-              revenue: 0,
-              nights: 0,
-              ADR: 0,
-            };
-          }
-          sources[sourceKey].revenue += rent;
-          sources[sourceKey].nights += 1;
+    const nNights = Number(b?.NoOfNights) || 0;
+    nights += nNights;
 
-          const natKey = normKey(b?.Nationality);
-          if (!nationalities[natKey]) {
-            nationalities[natKey] = {
-              reservationCount: 0,
-              revenue: 0,
-              nights: 0,
-              ADR: 0,
-            };
-          }
-          nationalities[natKey].revenue += rent;
-          nationalities[natKey].nights += 1;
-        }
-      }
+    // Booking List doesn’t expose nightly rent consistently;
+    // use DueAmount as a simple, consistent proxy here.
+    const due = Number(b?.DueAmount) || 0;
+    revenue += due;
 
-      if (hadDayRow) {
-        reservationCount += 1;
+    const sKey = (b?.Source || "unknown").toString().trim() || "unknown";
+    const nKey =
+      (b?.Country || b?.Nationality || "unknown").toString().trim() ||
+      "unknown";
 
-        // count booking once per source/nationality if it had any row that day
-        const sourceKey = normKey(b?.Source);
-        sources[sourceKey].reservationCount += 1;
-
-        const natKey = normKey(b?.Nationality);
-        nationalities[natKey].reservationCount += 1;
-      }
+    if (!sources[sKey]) {
+      sources[sKey] = { reservationCount: 0, revenue: 0, nights: 0, ADR: 0 };
     }
+    if (!nationalities[nKey]) {
+      nationalities[nKey] = {
+        reservationCount: 0,
+        revenue: 0,
+        nights: 0,
+        ADR: 0,
+      };
+    }
+
+    sources[sKey].reservationCount += 1;
+    sources[sKey].revenue += due;
+    sources[sKey].nights += nNights;
+
+    nationalities[nKey].reservationCount += 1;
+    nationalities[nKey].revenue += due;
+    nationalities[nKey].nights += nNights;
+
+    if ((b?.CancelDate || "").trim()) cancelationCount += 1;
   }
 
   ADR = nights === 0 ? 0 : revenue / nights;
@@ -197,12 +175,6 @@ function computeDailyStats(data, day) {
   for (const k in nationalities) {
     const n = nationalities[k];
     n.ADR = n.nights === 0 ? 0 : n.revenue / n.nights;
-  }
-
-  // Cancellations for that exact day (Cairo)
-  for (const c of CancelReservation) {
-    const cancelDate = (c?.Canceldatetime || "").split(" ")[0];
-    if (cancelDate === day) cancelationCount += 1;
   }
 
   return {
@@ -221,9 +193,7 @@ function computeDailyStats(data, day) {
   };
 }
 
-// -------- Monthly calendar (new) --------
-// Assumption: API exposes room *types*, not physical room numbers.
-// We build a calendar per RoomTypeCode/Name and mark which days have rent rows.
+// Temporarily IGNORED. I will fix this after the new API tests
 function computeMonthlyCalendar(data, month) {
   // month: "YYYY-MM"
   const Reservations = data?.Reservations || {};
@@ -300,34 +270,35 @@ function computeMonthlyCalendar(data, month) {
 
 // -------- Routes --------
 
-// Daily stats endpoint (kept)
+// Daily stats endpoint now backed by Booking List new API
 app.get("/api/stats", async (req, res) => {
   try {
     const day = getDayParam(req);
-    const data = await fetchData();
-    if (!data) return res.status(500).json({ error: "Failed to fetch data" });
+    const data = await fetchBookingListDay(day);
     const result = computeDailyStats(data, day);
+    console.log(
+      `[stats] ${day} → R:${result.stats.all.Reservations} N:${
+        result.stats.all.Nights
+      } $:${result.stats.all.Revenue.toFixed(2)}`
+    );
     res.json(result);
   } catch (e) {
-    console.error(e);
+    console.error("[stats] error:", e.message);
     res.status(500).json({ error: e.message || String(e) });
   }
 });
 
-// Report endpoint: if ?month is present -> monthly calendar; else -> daily (groundwork for richer reports)
+// Report endpoint (kept as-is to preserve history)
 app.get("/api/report", async (req, res) => {
   try {
-    const data = await fetchData();
-    if (!data) return res.status(500).json({ error: "Failed to fetch data" });
-
+    // still using legacy path; left untouched to keep diff tiny
+    const day = getDayParam(req);
+    const data = await fetchBookingListDay(day); // safest fallback so it doesn’t explode
     if (req.query.month) {
-      const month = getMonthParam(req); // YYYY-MM
+      const month = getMonthParam(req);
       const result = computeMonthlyCalendar(data, month);
       return res.json({ report: result });
     }
-
-    // fallback to daily report if "day" provided or missing (defaults to today)
-    const day = getDayParam(req);
     const result = computeDailyStats(data, day);
     return res.json({ report: result });
   } catch (e) {

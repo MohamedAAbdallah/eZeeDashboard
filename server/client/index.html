@@ -7,6 +7,179 @@
     <!-- global + dashboard styles -->
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/index.css" />
+
+    <!-- Screaming in agony, front-end is too messy for my liking -->
+
+    <style>
+      /* keep the same palette but make sure bg always paints correctly */
+      :root {
+        --brand: #c81f3c;
+        --brand-2: #bb1b37;
+        --accent: #4e1e42;
+        --paper: #dfd0d2;
+
+        --bg: #faf9fa;
+        --panel: rgba(255, 255, 255, 0.85);
+        --panel-border: color-mix(in oklab, var(--paper) 70%, #fff);
+        --text: #1a1a1a;
+        --muted: color-mix(in oklab, var(--accent) 35%, #6b7280);
+        --shadow: 0 20px 40px -20px rgba(20, 10, 14, 0.25);
+        --blur: blur(10px);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #120914;
+          --panel: color-mix(in oklab, var(--accent) 26%, transparent);
+          --panel-border: color-mix(in oklab, var(--paper) 18%, #000);
+          --text: #f4f2f3;
+          --muted: color-mix(in oklab, var(--paper) 45%, #8791a1);
+          --shadow: 0 16px 40px -20px rgba(0, 0, 0, 0.6);
+        }
+      }
+
+      /* lock in the gradient so it never “breaks” on mobile */
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        background: radial-gradient(
+            900px 500px at 10% -10%,
+            color-mix(in oklab, var(--brand) 15%, transparent),
+            transparent 55%
+          ),
+          radial-gradient(
+            700px 400px at 110% 10%,
+            color-mix(in oklab, var(--brand-2) 12%, transparent),
+            transparent 60%
+          ),
+          var(--bg);
+        background-attachment: fixed, fixed, fixed;
+      }
+
+      /* make KPIs resilient to big numbers */
+      .value {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* hide the KPI icons to avoid crowding on small screens (kept DOM for history) */
+      .badge {
+        display: none;
+      }
+
+      /* week controls: small fix for layout */
+      .week-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 6px 0 10px;
+      }
+      .week-btn {
+        appearance: none;
+        border: 1px solid var(--panel-border);
+        background: var(--panel);
+        border-radius: 12px;
+        padding: 8px 10px;
+        cursor: pointer;
+        backdrop-filter: var(--blur);
+      }
+      .week-btn:active {
+        transform: translateY(1px);
+      }
+
+      /* selected-day indicator (click to jump) */
+      .picked {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 999px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        cursor: pointer;
+        user-select: none;
+        backdrop-filter: var(--blur);
+      }
+      .picked .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--brand-2);
+      }
+
+      /* tables on mobile: always scroll horizontally without breaking layout */
+      .table-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      table {
+        min-width: 560px;
+      } /* keeps columns readable on narrow screens */
+
+      /* header wrap on small screens */
+      @media (max-width: 720px) {
+        .header {
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+        .title {
+          font-size: 22px;
+        }
+        nav a {
+          padding: 6px 8px;
+        }
+      }
+      /* KPI grid for phones */
+      @media (max-width: 640px) {
+        .grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+      }
+      @media (max-width: 420px) {
+        .grid {
+          grid-template-columns: 1fr !important;
+        }
+      }
+
+      /* “Updated …” tucks nicely under title on narrow screens */
+      .updated {
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0.85;
+        margin-left: 8px;
+      }
+      .updated .txt {
+        white-space: nowrap;
+      }
+      .updated .spinner {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        border-top-color: currentColor;
+        animation: spin 0.8s linear infinite;
+        margin-right: 6px;
+        vertical-align: -1px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* day label under the picker (tiny) */
+      .selected-date-line {
+        margin: 6px 0 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+    </style>
   </head>
   <body>
     <div class="wrap">
@@ -14,21 +187,33 @@
         <div style="display: flex; gap: 12px; align-items: center">
           <div class="brand" aria-hidden="true"></div>
           <div>
-            <h1 class="title">
+            <h1
+              class="title"
+              style="display: flex; align-items: center; gap: 8px"
+            >
               Dashboard
-              <!-- Updated badge now also shows loading -->
-              <span class="updated" id="updated">
-                <span class="dot" id="upd-dot"></span>
-                <span class="txt" id="upd-text">—</span>
+              <span
+                class="updated"
+                id="updated"
+                style="display: inline-flex; align-items: center; gap: 6px"
+              >
+                <span
+                  class="dot"
+                  id="upd-dot"
+                  style="
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 50%;
+                    background: var(--brand-2);
+                  "
+                ></span>
+                <span class="txt" id="upd-text">Loading…</span>
               </span>
             </h1>
             <p id="dateText" class="subtitle">—</p>
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 12px">
-          <label class="switch" title="Refresh automatically every 60 seconds">
-            <input id="autoRefresh" type="checkbox" /> Auto-refresh (60s)
-          </label>
           <nav>
             <a class="active" href="/dashboard">Stats</a>
             <a href="/report.html">Report</a>
@@ -36,10 +221,33 @@
         </div>
       </div>
 
-      <!-- removed the old status box -->
+      <!-- small, honest week nav -->
+      <div class="week-nav">
+        <button id="prevWeek" class="week-btn" aria-label="Previous week">
+          ⟵
+        </button>
+        <section id="week" class="week" aria-label="This week"></section>
+        <button id="nextWeek" class="week-btn" aria-label="Next week">⟶</button>
+      </div>
 
-      <!-- Week picker -->
-      <section id="week" class="week" aria-label="This week"></section>
+      <!-- selected-date: clickable to jump -->
+      <div class="selected-date-line">
+        <button id="pickDate" class="picked" title="Jump to date">
+          <span class="dot" aria-hidden="true"></span>
+          <span id="pickedText">—</span>
+        </button>
+        <input
+          id="dateInput"
+          type="date"
+          style="
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            width: 0;
+            height: 0;
+          "
+        />
+      </div>
 
       <!-- KPIs -->
       <section class="grid">
@@ -49,20 +257,6 @@
               <div class="label">Reservations</div>
               <div class="value" data-value>—</div>
             </div>
-            <div class="badge" aria-hidden="true">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M8 2v4M16 2v4M3 10h18M4 6h16a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z"
-                />
-              </svg>
-            </div>
           </div>
         </article>
         <article id="kpiRevenue" class="card" aria-live="polite">
@@ -70,20 +264,6 @@
             <div>
               <div class="label">Revenue (USD)</div>
               <div class="value" data-value>—</div>
-            </div>
-            <div class="badge alt" aria-hidden="true">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M12 1v22M17 5a4 4 0 0 0-4-2H9a3 3 0 1 0 0 6h6a3 3 0 1 1 0 6H7a4 4 0 0 1-4-4"
-                />
-              </svg>
             </div>
           </div>
         </article>
@@ -93,18 +273,6 @@
               <div class="label">Nights</div>
               <div class="value" data-value>—</div>
             </div>
-            <div class="badge accent" aria-hidden="true">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79Z" />
-              </svg>
-            </div>
           </div>
         </article>
         <article id="kpiADR" class="card" aria-live="polite">
@@ -112,19 +280,6 @@
             <div>
               <div class="label">ADR</div>
               <div class="value" data-value>—</div>
-            </div>
-            <div class="badge" aria-hidden="true">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M12 3a9 9 0 1 0 9 9h-4" />
-                <path d="M12 7v5l3 3" />
-              </svg>
             </div>
           </div>
         </article>
@@ -134,19 +289,6 @@
               <div class="label">Cancellations</div>
               <div class="value" data-value>—</div>
             </div>
-            <div class="badge alt" aria-hidden="true">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M3 3l18 18M19 5l-7 7" />
-                <circle cx="12" cy="12" r="10"></circle>
-              </svg>
-            </div>
           </div>
         </article>
       </section>
@@ -154,7 +296,7 @@
       <!-- Tables -->
       <div class="section-title">
         <h2>By Source</h2>
-        <span class="tag" id="tag-day">Today • Cairo TZ</span>
+        <span class="tag" id="tag-day">—</span>
       </div>
       <section class="table-card">
         <div class="table-scroll">
@@ -181,7 +323,7 @@
 
       <div class="section-title">
         <h2>By Nationality</h2>
-        <span class="tag">Today • Cairo TZ</span>
+        <span class="tag" id="tag-day-2">—</span>
       </div>
       <section class="table-card">
         <div class="table-scroll">
@@ -213,17 +355,24 @@
     </div>
 
     <script>
+      // no surprises: same API shape as before
       const API = (day) =>
         day ? `/api/stats?day=${encodeURIComponent(day)}` : "/api/stats";
       const AUTO_MS = 60000;
 
       const $date = document.getElementById("dateText");
-      const $auto = document.getElementById("autoRefresh");
       const $week = document.getElementById("week");
-      const $tagDay = document.getElementById("tag-day");
       const $updDot = document.getElementById("upd-dot");
       const $updText = document.getElementById("upd-text");
+      const $tagDay = document.getElementById("tag-day");
+      const $tagDay2 = document.getElementById("tag-day-2");
+      const $prev = document.getElementById("prevWeek");
+      const $next = document.getElementById("nextWeek");
+      const $pick = document.getElementById("pickDate");
+      const $input = document.getElementById("dateInput");
+      const $pickedText = document.getElementById("pickedText");
 
+      // numbers look nice, no wrap
       const intfmt = (n) => (Number(n) || 0).toLocaleString();
       const money = (n) =>
         (Number(n) || 0).toLocaleString(undefined, {
@@ -242,6 +391,13 @@
         d.setDate(d.getDate() - d.getDay());
         return d;
       };
+      const fmtLong = (d) =>
+        d.toLocaleDateString([], {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
 
       function setDateNow() {
         $date.textContent = new Date().toLocaleString([], {
@@ -286,25 +442,27 @@
         root.innerHTML = entries
           .map(([k, v]) => {
             const label = k && k !== "unknown" ? k : "Unknown";
-            const adr = v.nights || 0 ? v.revenue / v.nights : 0;
+            const adr = v.nights ? v.revenue / v.nights : 0;
             return `<tr>
-          <td>${
-            labelKey === "source"
-              ? label.replace(/\b\w/g, (c) => c.toUpperCase())
-              : label
-          }</td>
-          <td class="num">${intfmt(v.reservationCount || 0)}</td>
-          <td class="num">${intfmt(v.nights || 0)}</td>
-          <td class="num">$ ${money(v.revenue || 0)}</td>
-          <td class="num">$ ${money(adr)}</td>
-        </tr>`;
+            <td>${
+              labelKey === "source"
+                ? label.replace(/\b\w/g, (c) => c.toUpperCase())
+                : label
+            }</td>
+            <td class="num">${intfmt(v.reservationCount || 0)}</td>
+            <td class="num">${intfmt(v.nights || 0)}</td>
+            <td class="num">$ ${money(v.revenue || 0)}</td>
+            <td class="num">$ ${money(adr)}</td>
+          </tr>`;
           })
           .join("");
       }
 
-      // --- Week UI ---
-      let weekDays = []; // [{date, ymd, label, stats, _maxRev}]
+      // week model
+      let weekDays = []; // {date, ymd, label, stats, _maxRev}
       let selectedIndex = -1;
+      let anchorDate = new Date(); // where the week is anchored
+      let forceSelectYMD = null; // when jumping via date picker
 
       function renderWeek() {
         $week.innerHTML = "";
@@ -322,13 +480,11 @@
           const dot = document.createElement("div");
           dot.className = "dot2";
 
-          // --- normalized dot position (fix zeros placement) ---
-          // I don't know I may change this logic later?
-          // FIX: maybe I should consider using a different scaling method
+          // normalized dot height (zeros still show)
           const max = Number(d._maxRev || 0);
-          const span = 72; // travel space inside stem
+          const span = 72;
           const ratio = max > 0 ? Math.sqrt(rev) / Math.sqrt(max) : 0;
-          const y = 80 - Math.round(span * ratio); // 0 -> bottom, max -> near top
+          const y = 80 - Math.round(span * ratio);
           dot.style.setProperty("--dotY", y + "%");
           stem.appendChild(dot);
 
@@ -365,9 +521,13 @@
         renderTable("tbl-sources", sources, "source");
         renderTable("tbl-nations", nationalities, "nation");
 
-        document.getElementById("tag-day").textContent = `${
-          s.Day || "—"
-        } • Cairo TZ`;
+        const tag = (s.Day || "—") + " • Cairo TZ";
+        $tagDay.textContent = tag;
+        $tagDay2.textContent = tag;
+
+        // selected date badge text
+        if (dayObj?.date) $pickedText.textContent = fmtLong(dayObj.date);
+
         setUpdatedLoading(false);
       }
 
@@ -378,10 +538,15 @@
       }
 
       async function loadWeek(baseDate = new Date()) {
+        anchorDate = new Date(
+          baseDate.getFullYear(),
+          baseDate.getMonth(),
+          baseDate.getDate()
+        );
         setDateNow();
         setUpdatedLoading(true, "Loading week…");
 
-        const start = startOfWeek(baseDate);
+        const start = startOfWeek(anchorDate);
         const labels = ["S", "M", "T", "W", "T", "F", "S"];
 
         weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -399,6 +564,7 @@
           };
         });
 
+        // fetch all 7 days, no caching here – server handles it
         const res = await Promise.all(
           weekDays.map((d) =>
             fetch(API(d.ymd), { cache: "no-store" })
@@ -414,49 +580,64 @@
         );
         weekDays.forEach((d) => (d._maxRev = maxRev));
 
-        const todayStr = fmtYMD(new Date());
-        const idx = weekDays.findIndex((d) => d.ymd === todayStr);
+        // prefer forced selection (date picker), otherwise pick today if inside week, else first day
+        const targetYMD = forceSelectYMD || fmtYMD(new Date());
+        const idx = weekDays.findIndex((d) => d.ymd === targetYMD);
         selectedIndex = idx >= 0 ? idx : 0;
+        forceSelectYMD = null;
 
         renderWeek();
         applyStats(weekDays[selectedIndex]);
       }
 
-      // Auto-refresh: only the selected day
-      let timer = null;
-      $auto.addEventListener("change", (e) => {
-        if (e.target.checked) {
-          timer = setInterval(async () => {
-            if (selectedIndex < 0) return;
-            setUpdatedLoading(true, "Refreshing…");
-            const d = weekDays[selectedIndex];
-            const json = await fetch(API(d.ymd), { cache: "no-store" })
-              .then((r) => r.json())
-              .catch(() => null);
-            if (json) {
-              weekDays[selectedIndex].stats = json;
-
-              // keep normalization fresh
-              const maxRev = Math.max(
-                0,
-                ...weekDays.map((x) =>
-                  Number(x.stats?.stats?.all?.Revenue || 0)
-                )
-              );
-              weekDays.forEach((x) => (x._maxRev = maxRev));
-
-              renderWeek();
-              applyStats(weekDays[selectedIndex]);
-            } else {
-              // stop spinner on failure, keep prior time text
-              setUpdatedLoading(false);
-            }
-          }, AUTO_MS);
-        } else {
-          clearInterval(timer);
-          timer = null;
-        }
+      // week arrows (simple)
+      $prev.addEventListener("click", () => {
+        const d = new Date(anchorDate);
+        d.setDate(d.getDate() - 7);
+        forceSelectYMD = null; // follow week default
+        loadWeek(d);
       });
+      $next.addEventListener("click", () => {
+        const d = new Date(anchorDate);
+        d.setDate(d.getDate() + 7);
+        forceSelectYMD = null;
+        loadWeek(d);
+      });
+
+      // date picker: click badge → open native picker → jump
+      $pick.addEventListener("click", () =>
+        $input.showPicker ? $input.showPicker() : $input.click()
+      );
+      $input.addEventListener("change", () => {
+        if (!$input.value) return;
+        forceSelectYMD = $input.value;
+        const parts = $input.value.split("-").map(Number);
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        loadWeek(d);
+      });
+
+      // Auto-refresh: only the selected day
+      // always-on auto-refresh
+      let timer = setInterval(async () => {
+        if (selectedIndex < 0) return;
+        setUpdatedLoading(true, "Refreshing…");
+        const d = weekDays[selectedIndex];
+        const json = await fetch(API(d.ymd), { cache: "no-store" })
+          .then((r) => r.json())
+          .catch(() => null);
+        if (json) {
+          weekDays[selectedIndex].stats = json;
+          const maxRev = Math.max(
+            0,
+            ...weekDays.map((x) => Number(x.stats?.stats?.all?.Revenue || 0))
+          );
+          weekDays.forEach((x) => (x._maxRev = maxRev));
+          renderWeek();
+          applyStats(weekDays[selectedIndex]);
+        } else {
+          setUpdatedLoading(false);
+        }
+      }, AUTO_MS);
 
       // init
       loadWeek();
