@@ -1,0 +1,81 @@
+.week {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 14px;
+  border-radius: 18px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: var(--blur);
+  box-shadow: var(--shadow);
+  margin-bottom: 18px;
+}
+.daycol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.stem {
+  position: relative;
+  width: 2px;
+  height: 80px;
+  background: color-mix(in oklab, var(--muted) 28%, transparent);
+  border-radius: 999px;
+}
+.dot2 {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 45%, #7da1c8);
+  top: var(--dotY, 40%);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 15%, transparent);
+}
+.dlabel {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+}
+.daycol.active .stem {
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--brand-2) 40%, transparent),
+    color-mix(in oklab, var(--brand) 25%, transparent)
+  );
+  width: 10px;
+  border-radius: 999px;
+}
+.daycol.active .dlabel {
+  background: color-mix(in oklab, var(--brand-2) 14%, var(--panel));
+  color: var(--brand-2);
+  border-color: color-mix(in oklab, var(--brand-2) 40%, var(--panel-border));
+}
+.bubble {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #10131a;
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+  display: none;
+}
+.daycol.active .bubble {
+  display: block;
+}
