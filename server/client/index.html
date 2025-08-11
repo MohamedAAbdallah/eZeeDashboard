@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <title>Today's Statistics</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- global + dashboard styles -->
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/index.css" />
   </head>
@@ -15,9 +16,11 @@
           <div>
             <h1 class="title">
               Today's Statistics
-              <span class="updated" id="updated"
-                ><span class="dot"></span><span>—</span></span
-              >
+              <!-- Updated badge now also shows loading -->
+              <span class="updated" id="updated">
+                <span class="dot" id="upd-dot"></span>
+                <span class="txt" id="upd-text">—</span>
+              </span>
             </h1>
             <p id="dateText" class="subtitle">—</p>
           </div>
@@ -33,7 +36,7 @@
         </div>
       </div>
 
-      <div id="status" class="status">Connecting to API…</div>
+      <!-- removed the old status box -->
 
       <!-- Week picker -->
       <section id="week" class="week" aria-label="This week"></section>
@@ -214,12 +217,12 @@
         day ? `/api/stats?day=${encodeURIComponent(day)}` : "/api/stats";
       const AUTO_MS = 60000;
 
-      const $status = document.getElementById("status");
       const $date = document.getElementById("dateText");
       const $auto = document.getElementById("autoRefresh");
-      const $updated = document.getElementById("updated");
       const $week = document.getElementById("week");
       const $tagDay = document.getElementById("tag-day");
+      const $updDot = document.getElementById("upd-dot");
+      const $updText = document.getElementById("upd-text");
 
       const intfmt = (n) => (Number(n) || 0).toLocaleString();
       const money = (n) =>
@@ -228,21 +231,17 @@
           maximumFractionDigits: 2,
         });
 
-      // format YYYY-MM-DD using local time (no UTC shift)
       const fmtYMD = (d) =>
         [
           d.getFullYear(),
           String(d.getMonth() + 1).padStart(2, "0"),
           String(d.getDate()).padStart(2, "0"),
         ].join("-");
-
-      function startOfWeek(date) {
-        // Sunday -> Saturday
+      const startOfWeek = (date) => {
         const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-        const day = d.getDay(); // 0..6
-        d.setDate(d.getDate() - day);
+        d.setDate(d.getDate() - d.getDay());
         return d;
-      }
+      };
 
       function setDateNow() {
         $date.textContent = new Date().toLocaleString([], {
@@ -250,15 +249,19 @@
           timeStyle: "short",
         });
       }
-      function setUpdatedBadge(dt) {
-        const t =
-          typeof dt === "string"
-            ? dt
-            : new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              });
-        $updated.querySelector("span:last-child").textContent = `Updated ${t}`;
+      function setUpdatedLoading(on = true, text = "Loading…") {
+        if (on) {
+          $updDot.classList.add("spinner");
+          $updText.textContent = text;
+        } else {
+          $updDot.classList.remove("spinner");
+          $updText.textContent =
+            "Updated " +
+            new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+        }
       }
       function setKPI(id, value, fmt = (v) => v) {
         const el = document.querySelector(`#${id} [data-value]`);
@@ -300,7 +303,7 @@
       }
 
       // --- Week UI ---
-      let weekDays = []; // [{date:Date, ymd, label, stats}]
+      let weekDays = []; // [{date, ymd, label, stats}]
       let selectedIndex = -1;
 
       function renderWeek() {
@@ -323,7 +326,7 @@
           const dot = document.createElement("div");
           dot.className = "dot2";
           const rev = Number(d.stats?.stats?.all?.Revenue || 0);
-          const y = 80 - Math.min(72, Math.sqrt(rev)); // quick visual scale
+          const y = 80 - Math.min(72, Math.sqrt(rev));
           dot.style.setProperty("--dotY", y + "%");
           stem.appendChild(dot);
 
@@ -360,22 +363,21 @@
         renderTable("tbl-sources", sources, "source");
         renderTable("tbl-nations", nationalities, "nation");
 
-        $tagDay.textContent = `${s.Day || "—"} • Cairo TZ`;
-        setUpdatedBadge(); // time only
+        document.getElementById("tag-day").textContent = `${
+          s.Day || "—"
+        } • Cairo TZ`;
+        setUpdatedLoading(false);
       }
 
       function selectDay(index) {
         selectedIndex = index;
         renderWeek();
         applyStats(weekDays[selectedIndex]);
-        $status.textContent = `Day: ${weekDays[selectedIndex].ymd}`;
-        $status.className = "status ok";
       }
 
       async function loadWeek(baseDate = new Date()) {
         setDateNow();
-        $status.className = "status";
-        $status.textContent = "Loading week…";
+        setUpdatedLoading(true, "Loading week…");
 
         const start = startOfWeek(baseDate);
         const labels = ["S", "M", "T", "W", "T", "F", "S"];
@@ -389,7 +391,6 @@
           return { date: d, ymd: fmtYMD(d), label: labels[i], stats: null };
         });
 
-        // fetch all 7 days in parallel
         const res = await Promise.all(
           weekDays.map((d) =>
             fetch(API(d.ymd), { cache: "no-store" })
@@ -399,32 +400,32 @@
         );
         res.forEach((json, i) => (weekDays[i].stats = json || {}));
 
-        // select today by default
         const todayStr = fmtYMD(new Date());
         const idx = weekDays.findIndex((d) => d.ymd === todayStr);
         selectedIndex = idx >= 0 ? idx : 0;
 
         renderWeek();
         applyStats(weekDays[selectedIndex]);
-
-        $status.textContent = "Loaded";
-        $status.className = "status ok";
       }
 
-      // Auto-refresh: refresh only the selected day + refresh its bubble value
+      // Auto-refresh: only the selected day
       let timer = null;
       document.getElementById("autoRefresh").addEventListener("change", (e) => {
         if (e.target.checked) {
           timer = setInterval(async () => {
             if (selectedIndex < 0) return;
+            setUpdatedLoading(true, "Refreshing…");
             const d = weekDays[selectedIndex];
             const json = await fetch(API(d.ymd), { cache: "no-store" })
               .then((r) => r.json())
               .catch(() => null);
             if (json) {
               weekDays[selectedIndex].stats = json;
-              renderWeek(); // update bubble/dot
+              renderWeek();
               applyStats(weekDays[selectedIndex]);
+            } else {
+              // stop spinner on failure, keep prior time text
+              setUpdatedLoading(false);
             }
           }, AUTO_MS);
         } else {
