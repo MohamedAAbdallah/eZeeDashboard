@@ -3,6 +3,12 @@ import fetch from "node-fetch";
 import express from "express";
 
 const app = express();
+// Helpers
+function parse_date(date) {
+  if (typeof date !== "string") throw new TypeError("Invalid date format");
+  const [year, month, day] = date.split("-").map(Number);
+  return { year, month, day };
+}
 
 async function fetch_data(arrival_from, arrival_to) {
   console.log(`[fetch] BookingList from ${arrival_from} to ${arrival_to}`);
