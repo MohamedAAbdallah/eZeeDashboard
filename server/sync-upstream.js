@@ -60,32 +60,40 @@ app.get("/", async (req, res) => {
       Revenue: n.TotalExclusivTax,
     };
 
-    if (!data_processed.reservations[reservation.ReservationDate]) {
-      data_processed.reservations[reservation.ReservationDate] = {
+    const { year, month, day } = parse_date(reservation.ReservationDate);
+
+    if (!data_processed.reservations[year]) {
+      data_processed.reservations[year] = {};
+    }
+    if (!data_processed.reservations[year][month]) {
+      data_processed.reservations[year][month] = {};
+    }
+    if (!data_processed.reservations[year][month][day]) {
+      data_processed.reservations[year][month][day] = {
         ReservationCount: 0,
         Revenue: 0,
         Nights: 0,
         ADR: -1,
         Canceled: 0,
         Canceled_nights: 0,
-        ReservationsList: {},
+        ReservationsList: [],
       };
     }
 
     if (reservation.CancelDate === "") {
-      data_processed.reservations[
-        reservation.ReservationDate
-      ].ReservationCount += 1;
-      data_processed.reservations[reservation.ReservationDate].Revenue +=
+      data_processed.reservations[year][month][day].ReservationCount += 1;
+      data_processed.reservations[year][month][day].Revenue +=
         reservation.Revenue;
-      data_processed.reservations[reservation.ReservationDate].Nights +=
+      data_processed.reservations[year][month][day].Nights +=
         reservation.NoOfNights;
     } else {
-      data_processed.reservations[reservation.ReservationDate].Canceled += 1;
-      data_processed.reservations[
-        reservation.ReservationDate
-      ].Canceled_nights += reservation.NoOfNights;
+      data_processed.reservations[year][month][day].Canceled += 1;
+      data_processed.reservations[year][month][day].Canceled_nights +=
+        reservation.NoOfNights;
     }
+    data_processed.reservations[year][month][day].ReservationsList.push(
+      reservation
+    );
   }
 
   // TODO: save data to disk
