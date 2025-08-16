@@ -56,7 +56,7 @@ app.get("/", async (req, res) => {
       RoomNo: n.RoomNo,
       Source: n.Source,
 
-      NoOfNights: n.NoOfNights,
+      Nights: n.NoOfNights,
       Revenue: n.TotalExclusivTax,
     };
 
@@ -70,33 +70,47 @@ app.get("/", async (req, res) => {
     }
     if (!data_processed[year][month][day]) {
       data_processed[year][month][day] = {
-        ReservationCount: 0,
-        Revenue: 0,
-        Nights: 0,
+        ReservationCount: -1,
+        Revenue: -1,
+        Nights: -1,
         ADR: -1,
-        Canceled: 0,
-        Canceled_nights: 0,
+        Canceled: -1,
+        CanceledNights: -1,
         ReservationsList: [],
         CanceledList: [],
       };
     }
 
     if (reservation.CancelDate === "") {
-      data_processed[year][month][day].ReservationCount += 1;
-      data_processed[year][month][day].Revenue +=
-        reservation.Revenue;
-      data_processed[year][month][day].Nights +=
-        reservation.NoOfNights;
-      data_processed[year][month][day].ReservationsList.push(
-        reservation
-      );
+      data_processed[year][month][day].ReservationsList.push(reservation);
     } else {
-      data_processed[year][month][day].Canceled += 1;
-      data_processed[year][month][day].Canceled_nights +=
-        reservation.NoOfNights;
-      data_processed[year][month][day].CanceledList.push(
-        reservation
-      );
+      data_processed[year][month][day].CanceledList.push(reservation);
+    }
+  }
+
+  for (let year of Object.keys(data_processed)) {
+    for (let month of Object.keys(data_processed[year])) {
+      for (let day of Object.keys(data_processed[year][month])) {
+        const entry = data_processed[year][month][day];
+
+        entry.ReservationCount = entry.ReservationsList.length;
+        entry.Revenue = 0;
+        entry.Nights = 0;
+
+        for (let reservation of entry.ReservationsList) {
+          entry.Revenue += reservation.Revenue;
+          entry.Nights += reservation.Nights;
+        }
+
+        entry.ADR = entry.Revenue / entry.Nights || 0;
+
+        entry.Canceled = entry.CanceledList.length;
+        entry.CanceledNights = 0;
+
+        for (let canceled_reservation of entry.CanceledList) {
+          entry.CanceledNights += canceled_reservation.Nights;
+        }
+      }
     }
   }
 
