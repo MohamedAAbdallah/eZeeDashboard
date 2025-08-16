@@ -41,7 +41,7 @@ async function fetch_data(arrival_from, arrival_to) {
 
 app.get("/", async (req, res) => {
   const data = await fetch_data("2025-08-01", "2025-8-16");
-  let data_processed = { reservations: {} };
+  let data_processed = {};
   let reservation = {};
 
   for (let n of data.BookingList) {
@@ -62,14 +62,14 @@ app.get("/", async (req, res) => {
 
     const { year, month, day } = parse_date(reservation.ReservationDate);
 
-    if (!data_processed.reservations[year]) {
-      data_processed.reservations[year] = {};
+    if (!data_processed[year]) {
+      data_processed[year] = {};
     }
-    if (!data_processed.reservations[year][month]) {
-      data_processed.reservations[year][month] = {};
+    if (!data_processed[year][month]) {
+      data_processed[year][month] = {};
     }
-    if (!data_processed.reservations[year][month][day]) {
-      data_processed.reservations[year][month][day] = {
+    if (!data_processed[year][month][day]) {
+      data_processed[year][month][day] = {
         ReservationCount: 0,
         Revenue: 0,
         Nights: 0,
@@ -82,19 +82,19 @@ app.get("/", async (req, res) => {
     }
 
     if (reservation.CancelDate === "") {
-      data_processed.reservations[year][month][day].ReservationCount += 1;
-      data_processed.reservations[year][month][day].Revenue +=
+      data_processed[year][month][day].ReservationCount += 1;
+      data_processed[year][month][day].Revenue +=
         reservation.Revenue;
-      data_processed.reservations[year][month][day].Nights +=
+      data_processed[year][month][day].Nights +=
         reservation.NoOfNights;
-      data_processed.reservations[year][month][day].ReservationsList.push(
+      data_processed[year][month][day].ReservationsList.push(
         reservation
       );
     } else {
-      data_processed.reservations[year][month][day].Canceled += 1;
-      data_processed.reservations[year][month][day].Canceled_nights +=
+      data_processed[year][month][day].Canceled += 1;
+      data_processed[year][month][day].Canceled_nights +=
         reservation.NoOfNights;
-      data_processed.reservations[year][month][day].CanceledList.push(
+      data_processed[year][month][day].CanceledList.push(
         reservation
       );
     }
