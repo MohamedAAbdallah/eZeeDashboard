@@ -39,6 +39,60 @@ async function fetch_data(arrival_from, arrival_to) {
   return data;
 }
 
+app.get("/", async (req, res) => {
+  const data = await fetch_data("2025-08-01", "2025-8-16");
+  let data_processed = { reservations: {} };
+  let reservation = {};
+
+  for (let n of data.BookingList) {
+    reservation = {
+      ReservationNo: n.ReservationNo,
+      ReservationDate: n.ReservationDate,
+
+      ArrivalDate: n.ArrivalDate,
+      DepartureDate: n.DepartureDate,
+      CancelDate: n.CancelDate,
+
+      RoomNo: n.RoomNo,
+      Source: n.Source,
+
+      NoOfNights: n.NoOfNights,
+      Revenue: n.TotalExclusivTax,
+    };
+
+    if (!data_processed.reservations[reservation.ReservationDate]) {
+      data_processed.reservations[reservation.ReservationDate] = {
+        ReservationCount: 0,
+        Revenue: 0,
+        Nights: 0,
+        ADR: -1,
+        Canceled: 0,
+        Canceled_nights: 0,
+        ReservationsList: {},
+      };
+    }
+
+    if (reservation.CancelDate === "") {
+      data_processed.reservations[
+        reservation.ReservationDate
+      ].ReservationCount += 1;
+      data_processed.reservations[reservation.ReservationDate].Revenue +=
+        reservation.Revenue;
+      data_processed.reservations[reservation.ReservationDate].Nights +=
+        reservation.NoOfNights;
+    } else {
+      data_processed.reservations[reservation.ReservationDate].Canceled += 1;
+      data_processed.reservations[
+        reservation.ReservationDate
+      ].Canceled_nights += reservation.NoOfNights;
+    }
+  }
+
+  // TODO: save data to disk
+
+  res.json(data_processed);
+});
+
 app.listen(process.env.PORT, () => {
   console.log("Server listening");
 });
