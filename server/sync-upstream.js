@@ -77,6 +77,7 @@ app.get("/", async (req, res) => {
         Canceled: 0,
         Canceled_nights: 0,
         ReservationsList: [],
+        CanceledList: [],
       };
     }
 
@@ -86,14 +87,17 @@ app.get("/", async (req, res) => {
         reservation.Revenue;
       data_processed.reservations[year][month][day].Nights +=
         reservation.NoOfNights;
+      data_processed.reservations[year][month][day].ReservationsList.push(
+        reservation
+      );
     } else {
       data_processed.reservations[year][month][day].Canceled += 1;
       data_processed.reservations[year][month][day].Canceled_nights +=
         reservation.NoOfNights;
+      data_processed.reservations[year][month][day].CanceledList.push(
+        reservation
+      );
     }
-    data_processed.reservations[year][month][day].ReservationsList.push(
-      reservation
-    );
   }
 
   // TODO: save data to disk
